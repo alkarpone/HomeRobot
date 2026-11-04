@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HomeRobot.Server/HomeRobot.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HomeRobot.Tests/HomeRobot.Tests.csproj" />
+  </Folder>
+</Solution>
