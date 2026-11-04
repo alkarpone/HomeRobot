@@ -16,16 +16,25 @@ public sealed class OllamaProvider(
 {
     public string Model => options.Value.Model;
 
-    public async Task<string> GenerateAsync(
-        IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken)
+    public Task<string> GenerateAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken) =>
+        GenerateAsync(messages, json: false, cancellationToken);
+
+    public Task<string> GenerateJsonAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken) =>
+        GenerateAsync(messages, json: true, cancellationToken);
+
+    private async Task<string> GenerateAsync(
+        IReadOnlyList<ChatMessage> messages, bool json, CancellationToken cancellationToken)
     {
         if (messages.Count == 0)
             throw new ArgumentException("At least one message is required.", nameof(messages));
 
         try
         {
-            using var response = await client.PostAsJsonAsync("/api/chat",
-                new { model = Model, messages, stream = false }, cancellationToken);
+            using var response = json
+                ? await client.PostAsJsonAsync("/api/chat",
+                    new { model = Model, messages, stream = false, format = "json" }, cancellationToken)
+                : await client.PostAsJsonAsync("/api/chat",
+                    new { model = Model, messages, stream = false }, cancellationToken);
             if (response.StatusCode == HttpStatusCode.NotFound)
                 throw Failure(503, "Configured Ollama model is unavailable.");
             if (!response.IsSuccessStatusCode)

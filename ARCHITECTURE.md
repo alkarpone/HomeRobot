@@ -44,3 +44,23 @@ The Whisper adapter starts a persistent Python worker on the first non-silent re
 Voice chat passes the transcription to the same `ConversationStore` and `IAIProvider` used by text chat. The per-session gate covers AI generation and synthesis, and the store commits a voice turn only after both succeed. Timings include provider queue time, and total processing includes WAV validation and Base64 encoding.
 
 `ITextToSpeechService` isolates Piper behind a configurable executable. It uses a local voice model and per-call temporary UTF-8 text and WAV files, which are removed after processing. Piper invocations are serialized. Provider deadlines include queue time, and the adapters stop subprocesses on cancellation. Provider output is discarded or read through private pipes without logging audio or conversation text.
+
+## Robot communication
+
+ESP32 and the macOS simulator share the versioned JSON protocol on `/ws/robot`. The WebSocket handler validates device messages, serializes outbound frames through one writer, and monitors monotonic connection and command deadlines. The in-memory registry coordinates active connections, telemetry, command transitions, and bounded command history across WebSocket and REST requests.
+
+`/api/robots` exposes connected devices and accepts validated commands. Emergency stop preempts queued traffic and blocks new motion until confirmed. Robot communication is independent of the AI and voice pipelines. Devices enforce physical safety locally. See the [protocol reference](docs/ROBOT_PROTOCOL.md).
+
+## macOS simulator
+
+The native SwiftUI app runs on macOS 14+. Manual controls submit commands through the same REST endpoints as other P4 clients. A single WebSocket reader stays active during motion, and one writer orders registration, heartbeat, telemetry, and command transitions. The device stops locally when the socket closes or the peer stops answering WebSocket pings. Reconnection is user-initiated.
+
+A deterministic differential-drive model uses monotonic elapsed time to integrate translation and in-place rotation and clamp travel to the requested target. The dashboard reads the model's pose and wheel travel through a Canvas. Face animation uses SwiftUI independently of motion. The app sends telemetry on state changes and at 8 Hz by default while moving. On emergency stop, it halts immediately and confirms the stop. P4 already records the interrupted movement as cancelled.
+
+## AI robot commands
+
+`RobotCommandInterpreter` sends each Czech or English instruction to the P2 provider as a separate JSON-mode request. It accepts up to five actions and validates the entire plan with the P4 command parser and configured limits before execution. The supported commands are `move_forward`, `move_backward`, `rotate_left`, `rotate_right`, `set_expression`, and a final or standalone `stop`.
+
+A reservation binds each plan to its current P4 connection from interpretation onward. The hosted executor tracks accepted plans in memory and submits one action at a time through P4. It advances only after a device-confirmed completion. Failure, timeout, disconnect, or cancellation ends the sequence. The registry cancels the reservation atomically with external emergency stop, so even a stop between actions prevents further submission. P4 retains ownership of dispatch, deadlines, and stop priority. Movement is never retried.
+
+The AI endpoints use the same trusted-network boundary as P4. Automated coverage substitutes the AI provider and uses in-process WebSocket peers. P6-B will verify live Czech and English interpretation, rejection behavior, and stop during motion with local Qwen and the macOS simulator.

@@ -1,0 +1,183 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 77;
+    objects = {
+        A00000000000000000000001 = {
+            isa = PBXProject;
+            attributes = {
+                LastUpgradeCheck = 1640;
+                TargetAttributes = {
+                    A00000000000000000000002 = { CreatedOnToolsVersion = 16.4; };
+                    A00000000000000000000003 = { CreatedOnToolsVersion = 16.4; TestTargetID = A00000000000000000000002; };
+                };
+            };
+            buildConfigurationList = A00000000000000000000020;
+            compatibilityVersion = "Xcode 16.0";
+            developmentRegion = en;
+            knownRegions = (en, Base);
+            mainGroup = A00000000000000000000004;
+            productRefGroup = A00000000000000000000005;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (A00000000000000000000002, A00000000000000000000003);
+        };
+        A00000000000000000000002 = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = A00000000000000000000021;
+            buildPhases = (A00000000000000000000010, A00000000000000000000011, A00000000000000000000012);
+            buildRules = ();
+            dependencies = ();
+            fileSystemSynchronizedGroups = (A00000000000000000000006);
+            name = HomeRobot.Simulator.Mac;
+            productName = HomeRobot.Simulator.Mac;
+            productReference = A00000000000000000000008;
+            productType = "com.apple.product-type.application";
+        };
+        A00000000000000000000003 = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = A00000000000000000000022;
+            buildPhases = (A00000000000000000000013, A00000000000000000000014);
+            buildRules = ();
+            dependencies = (A00000000000000000000015);
+            fileSystemSynchronizedGroups = (A00000000000000000000007);
+            name = HomeRobotSimulatorTests;
+            productName = HomeRobotSimulatorTests;
+            productReference = A00000000000000000000009;
+            productType = "com.apple.product-type.bundle.unit-test";
+        };
+        A00000000000000000000004 = {
+            isa = PBXGroup;
+            children = (A00000000000000000000006, A00000000000000000000007, A00000000000000000000005);
+            sourceTree = "<group>";
+        };
+        A00000000000000000000005 = {
+            isa = PBXGroup;
+            children = (A00000000000000000000008, A00000000000000000000009);
+            name = Products;
+            sourceTree = "<group>";
+        };
+        A00000000000000000000006 = {
+            isa = PBXFileSystemSynchronizedRootGroup;
+            path = HomeRobotSimulator;
+            sourceTree = "<group>";
+        };
+        A00000000000000000000007 = {
+            isa = PBXFileSystemSynchronizedRootGroup;
+            path = HomeRobotSimulatorTests;
+            sourceTree = "<group>";
+        };
+        A00000000000000000000008 = {
+            isa = PBXFileReference;
+            explicitFileType = wrapper.application;
+            path = HomeRobot.Simulator.Mac.app;
+            sourceTree = BUILT_PRODUCTS_DIR;
+        };
+        A00000000000000000000009 = {
+            isa = PBXFileReference;
+            explicitFileType = wrapper.cfbundle;
+            path = HomeRobotSimulatorTests.xctest;
+            sourceTree = BUILT_PRODUCTS_DIR;
+        };
+        A00000000000000000000010 = { isa = PBXSourcesBuildPhase; files = (); };
+        A00000000000000000000011 = { isa = PBXFrameworksBuildPhase; files = (); };
+        A00000000000000000000012 = { isa = PBXResourcesBuildPhase; files = (); };
+        A00000000000000000000013 = { isa = PBXSourcesBuildPhase; files = (); };
+        A00000000000000000000014 = { isa = PBXFrameworksBuildPhase; files = (); };
+        A00000000000000000000015 = {
+            isa = PBXTargetDependency;
+            target = A00000000000000000000002;
+            targetProxy = A00000000000000000000016;
+        };
+        A00000000000000000000016 = {
+            isa = PBXContainerItemProxy;
+            containerPortal = A00000000000000000000001;
+            proxyType = 1;
+            remoteGlobalIDString = A00000000000000000000002;
+            remoteInfo = HomeRobot.Simulator.Mac;
+        };
+        A00000000000000000000020 = {
+            isa = XCConfigurationList;
+            buildConfigurations = (A00000000000000000000030, A00000000000000000000031);
+            defaultConfigurationName = Release;
+        };
+        A00000000000000000000021 = {
+            isa = XCConfigurationList;
+            buildConfigurations = (A00000000000000000000032, A00000000000000000000033);
+            defaultConfigurationName = Release;
+        };
+        A00000000000000000000022 = {
+            isa = XCConfigurationList;
+            buildConfigurations = (A00000000000000000000034, A00000000000000000000035);
+            defaultConfigurationName = Release;
+        };
+        A00000000000000000000030 = {
+            isa = XCBuildConfiguration;
+            name = Debug;
+            buildSettings = {
+                CODE_SIGN_IDENTITY = "-";
+                ENABLE_TESTABILITY = YES;
+                MACOSX_DEPLOYMENT_TARGET = 14.0;
+                SDKROOT = macosx;
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+                SWIFT_VERSION = 6.0;
+            };
+        };
+        A00000000000000000000031 = {
+            isa = XCBuildConfiguration;
+            name = Release;
+            buildSettings = {
+                CODE_SIGN_IDENTITY = "-";
+                ENABLE_TESTABILITY = YES;
+                MACOSX_DEPLOYMENT_TARGET = 14.0;
+                SDKROOT = macosx;
+                SWIFT_COMPILATION_MODE = wholemodule;
+                SWIFT_VERSION = 6.0;
+            };
+        };
+        A00000000000000000000032 = {
+            isa = XCBuildConfiguration;
+            name = Debug;
+            buildSettings = {
+                GENERATE_INFOPLIST_FILE = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = com.alkarpone.HomeRobot.Simulator.Mac;
+                PRODUCT_MODULE_NAME = HomeRobotSimulator;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+            };
+        };
+        A00000000000000000000033 = {
+            isa = XCBuildConfiguration;
+            name = Release;
+            buildSettings = {
+                GENERATE_INFOPLIST_FILE = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = com.alkarpone.HomeRobot.Simulator.Mac;
+                PRODUCT_MODULE_NAME = HomeRobotSimulator;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+            };
+        };
+        A00000000000000000000034 = {
+            isa = XCBuildConfiguration;
+            name = Debug;
+            buildSettings = {
+                BUNDLE_LOADER = "$(TEST_HOST)";
+                GENERATE_INFOPLIST_FILE = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = com.alkarpone.HomeRobot.Simulator.Mac.Tests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HomeRobot.Simulator.Mac.app/Contents/MacOS/HomeRobot.Simulator.Mac";
+            };
+        };
+        A00000000000000000000035 = {
+            isa = XCBuildConfiguration;
+            name = Release;
+            buildSettings = {
+                BUNDLE_LOADER = "$(TEST_HOST)";
+                GENERATE_INFOPLIST_FILE = YES;
+                PRODUCT_BUNDLE_IDENTIFIER = com.alkarpone.HomeRobot.Simulator.Mac.Tests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/HomeRobot.Simulator.Mac.app/Contents/MacOS/HomeRobot.Simulator.Mac";
+            };
+        };
+    };
+    rootObject = A00000000000000000000001;
+}

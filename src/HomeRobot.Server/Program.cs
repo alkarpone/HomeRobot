@@ -6,6 +6,13 @@ using HomeRobot.Server.Communication;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddSingleton<RobotWebSocket>();
+builder.Services.AddSingleton<RobotRegistry>();
+builder.Services.AddTransient<IRobotCommandInterpreter, RobotCommandInterpreter>();
+builder.Services.AddSingleton<RobotPlanExecutor>();
+builder.Services.AddHostedService(services => services.GetRequiredService<RobotPlanExecutor>());
+builder.Services.AddOptions<RobotProtocolOptions>().BindConfiguration("RobotProtocol")
+    .Validate(options => options.IsValid(), "Invalid robot protocol configuration.")
+    .ValidateOnStart();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ConversationStore>();

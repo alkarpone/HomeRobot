@@ -3,6 +3,9 @@ namespace HomeRobot.Server.AI;
 public interface IAIProvider
 {
     Task<string> GenerateAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken);
+
+    Task<string> GenerateJsonAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken) =>
+        GenerateAsync(messages, cancellationToken);
 }
 
 public sealed record ChatMessage

@@ -1,6 +1,6 @@
 # HomeRobot
 
-HomeRobot is an ASP.NET Core backend for an ESP32 home robot. It currently provides diagnostics and a basic device communication protocol. It supports local text and Czech voice conversations through Ollama.
+HomeRobot includes an ASP.NET Core backend for an ESP32 home robot and a native macOS robot simulator. It currently provides diagnostics and a versioned robot communication protocol. It supports local text and Czech voice conversations through Ollama.
 
 ## Requirements
 
@@ -28,9 +28,62 @@ curl http://localhost:5080/api/health
 
 ## Robot WebSocket
 
-Connect to `ws://localhost:5080/ws/robot` with a WebSocket client. Send the text frame `{"type":"ping"}` to receive `{"type":"pong"}`.
+ESP32 devices and simulators connect to `ws://localhost:5080/ws/robot` and register with protocol version 1. The server tracks connection state, telemetry, and command execution. The P1 diagnostic `{"type":"ping"}` still returns `{"type":"pong"}`.
 
-Messages are JSON objects with a string `type`. Invalid JSON, invalid message shape, and unsupported message types return an `error` object with a `code` while keeping the connection open. The server closes connections that send messages larger than 4 KiB.
+```sh
+curl http://localhost:5080/api/robots
+curl -X POST http://localhost:5080/api/robots/robot-001/stop
+```
+
+See the [robot protocol reference](docs/ROBOT_PROTOCOL.md) for message schemas, command submission, configuration, and device safety requirements.
+
+## AI robot commands
+
+With a robot connected, submit a Czech or English instruction. A valid plan returns HTTP 202 with its ID, interpreted actions, initial status, and a `Location` to poll.
+
+```sh
+curl -i http://localhost:5080/api/robots/robot-001/ai/command \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"Otoč se doprava o 90 stupňů a popojeď 50 centimetrů."}'
+curl http://localhost:5080/api/robots/robot-001/ai/plans/PLAN_ID
+curl -X POST http://localhost:5080/api/robots/robot-001/stop
+```
+
+Plans support up to five actions using the P4 contracts. Use explicit distances for `move_forward` and `move_backward`, and explicit angles for `rotate_left` and `rotate_right`. An omitted speed defaults to 30% or the configured maximum if lower. `set_expression` takes an expression identifier. `stop` can stand alone or end a plan. Use the direct P4 stop endpoint for emergencies.
+
+The server validates every action against the configured P4 safety limits before dispatching any action. Ambiguous or invalid plans return HTTP 422 with `validationErrors`. A conflicting plan returns HTTP 409. Each accepted action waits for confirmed completion before the next starts. Failure, timeout, disconnect, or emergency stop ends the sequence and cancels remaining actions. The status endpoint includes per-action state and any P4 command ID. The latest 256 finished plans are kept in memory until restart or eviction.
+
+The .NET tests mock the AI provider and use in-process WebSocket peers. P6-B will verify live Qwen output in both languages, rejection of ambiguous or unsafe requests, and end-to-end execution and emergency stop with the macOS simulator.
+
+## macOS simulator
+
+Requires macOS 14 or later and Xcode 16 or later. Start the server on the simulator's default port, then open the project:
+
+```sh
+dotnet run --project src/HomeRobot.Server -- --urls http://localhost:5000
+open src/HomeRobot.Simulator.Mac/HomeRobotSimulator.xcodeproj
+```
+
+Select the `HomeRobotSimulator` scheme and **My Mac**, then run with ⌘R. Click **Connect**. For the port 5080 setup above, enter `ws://localhost:5080/ws/robot`. The URL and simulator ID persist across launches. The robot endpoints are unauthenticated and intended for trusted development networks.
+
+Set a distance, rotation angle, and speed, then click a direction. Watch the position, wheel speeds, and command status. Click **Stop** during a long move to verify that both wheels stop immediately. The buttons submit through P4 REST, and the simulator executes the commands it receives over WebSocket. To test a face expression, substitute the dashboard's robot ID:
+
+```sh
+curl -X POST http://localhost:5000/api/robots/ROBOT_ID/commands \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"set_expression","parameters":{"expression":"happy"}}'
+```
+
+Run the Swift tests with ⌘U or:
+
+```sh
+xcodebuild -project src/HomeRobot.Simulator.Mac/HomeRobotSimulator.xcodeproj \
+  -scheme HomeRobotSimulator -destination 'platform=macOS' test
+```
+
+With a server running, set `TEST_RUNNER_HOMEROBOT_INTEGRATION_WS=ws://localhost:5000/ws/robot` before the `xcodebuild` command to include the live P4 test. Close any running simulator first to avoid a duplicate robot ID.
+
+The model assumes instantaneous speed changes, no wheel slip, an unbounded plane, and a fixed battery reading of 100%. Default simulated wheelbase is 31.83 cm and nominal wheel speed is 100 cm/s. Override `wheelbaseCm`, `maxWheelSpeedCmPerSecond`, or `telemetryHz` (8 by default, up to 30) in the app's UserDefaults domain `com.alkarpone.HomeRobot.Simulator.Mac` before launching. If server safety limits change, align `maxDistanceCm`, `maxRotationDegrees`, and `maxSpeedPercent` in the same domain. Slow commands can exceed the server's command deadline, which defaults to 10 seconds.
 
 ## Ollama text chat
 
