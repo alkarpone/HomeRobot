@@ -1,0 +1,457 @@
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x1 (POWERON),boot:0xb (SPI_FAST_FLASH_BOOT)
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x158c
+load:0x403c8700,len:0xd24
+load:0x403cb700,len:0x2f34
+entry 0x403c8924
+I (24) boot: ESP-IDF v5.5.2 2nd stage bootloader
+I (25) boot: compile time Nov  9 2026 18:31:31
+I (25) boot: Multicore bootloader
+I (25) boot: chip revision: v0.2
+I (28) boot: efuse block revision: v1.4
+I (31) boot.esp32s3: Boot SPI Speed : 80MHz
+I (35) boot.esp32s3: SPI Mode       : DIO
+I (39) boot.esp32s3: SPI Flash Size : 16MB
+I (43) boot: Enabling RNG early entropy source...
+I (47) boot: Partition Table:
+I (50) boot: ## Label            Usage          Type ST Offset   Length
+I (56) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (63) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (69) boot:  2 factory          factory app      00 00 00010000 00300000
+I (76) boot:  3 wifi_cfg         WiFi data        01 02 00310000 00006000
+I (82) boot: End of partition table
+I (86) esp_image: segment 0: paddr=00010020 vaddr=3c020020 size=093ach ( 37804) map
+I (100) esp_image: segment 1: paddr=000193d4 vaddr=3fc93600 size=028e0h ( 10464) load
+I (103) esp_image: segment 2: paddr=0001bcbc vaddr=40374000 size=0435ch ( 17244) load
+I (112) esp_image: segment 3: paddr=00020020 vaddr=42000020 size=12384h ( 74628) map
+I (129) esp_image: segment 4: paddr=000323ac vaddr=4037835c size=0b278h ( 45688) load
+I (139) esp_image: segment 5: paddr=0003d62c vaddr=50000000 size=00020h (    32) load
+I (145) boot: Loaded app from partition at offset 0x10000
+I (145) boot: Disabling RNG early entropy source...
+I (157) cpu_start: Multicore app
+I (165) cpu_start: GPIO 44 and 43 are used as console UART I/O pins
+I (166) cpu_start: Pro cpu start user code
+I (166) cpu_start: cpu freq: 160000000 Hz
+I (167) app_init: Application information:
+I (171) app_init: Project name:     oled_i2c_diagnostic
+I (176) app_init: App version:      f27b979-dirty
+I (180) app_init: Compile time:     Nov  9 2026 22:27:01
+I (186) app_init: ELF file SHA256:  b61e09c5e...
+I (190) app_init: ESP-IDF:          v5.5.2
+I (194) efuse_init: Min chip rev:     v0.0
+I (197) efuse_init: Max chip rev:     v0.99 
+I (201) efuse_init: Chip rev:         v0.2
+I (205) heap_init: Initializing. RAM available for dynamic allocation:
+I (212) heap_init: At 3FC967F8 len 00052F18 (331 KiB): RAM
+I (217) heap_init: At 3FCE9710 len 00005724 (21 KiB): RAM
+I (222) heap_init: At 3FCF0000 len 00008000 (32 KiB): DRAM
+I (227) heap_init: At 600FE000 len 00001FE8 (7 KiB): RTCRAM
+I (233) spi_flash: detected chip: boya
+I (236) spi_flash: flash io: dio
+W (239) i2c: This driver is an old driver, please migrate your application code to adapt `driver/i2c_master.h`
+I (249) sleep_gpio: Configure to isolate all GPIO pins in sleep state
+I (255) sleep_gpio: Enable automatic switching of GPIO sleep configuration
+I (262) main_task: Started on CPU0
+I (272) main_task: Calling app_main()
+I (2272) oled_i2c_diag: I2C0 SDA=GPIO1 SCL=GPIO2, internal pull-ups enabled, timeout=50 ms
+I (2272) oled_i2c_diag: Scanning 7-bit addresses 0x08-0x77 with address-only writes
+I (2292) oled_i2c_diag: 10 kHz idle: SDA=1 SCL=1
+================IO DUMP Start================
+IO[1] -
+  Pullup: 1, Pulldown: 0, DriveCap: 2
+  InputEn: 1, OutputEn: [periph_sig_ctrl], OpenDrain: 1
+  FuncSel: 1 (GPIO)
+  GPIO Matrix SigOut ID: 90
+  GPIO Matrix SigIn ID: 90
+  SleepSelEn: 1
+
+IO[2] -
+  Pullup: 1, Pulldown: 0, DriveCap: 2
+  InputEn: 1, OutputEn: [periph_sig_ctrl], OpenDrain: 1
+  FuncSel: 1 (GPIO)
+  GPIO Matrix SigOut ID: 89
+  GPIO Matrix SigIn ID: 89
+  SleepSelEn: 1
+
+=================IO DUMP End=================
+I (2322) oled_i2c_diag: 10 kHz 0x08 NACK
+I (2332) oled_i2c_diag: 10 kHz 0x09 NACK
+I (2332) oled_i2c_diag: 10 kHz 0x0A NACK
+I (2332) oled_i2c_diag: 10 kHz 0x0B NACK
+I (2342) oled_i2c_diag: 10 kHz 0x0C NACK
+I (2342) oled_i2c_diag: 10 kHz 0x0D NACK
+I (2342) oled_i2c_diag: 10 kHz 0x0E NACK
+I (2352) oled_i2c_diag: 10 kHz 0x0F NACK
+I (2352) oled_i2c_diag: 10 kHz 0x10 NACK
+I (2362) oled_i2c_diag: 10 kHz 0x11 NACK
+I (2362) oled_i2c_diag: 10 kHz 0x12 NACK
+I (2362) oled_i2c_diag: 10 kHz 0x13 NACK
+I (2372) oled_i2c_diag: 10 kHz 0x14 NACK
+I (2372) oled_i2c_diag: 10 kHz 0x15 NACK
+I (2372) oled_i2c_diag: 10 kHz 0x16 NACK
+I (2382) oled_i2c_diag: 10 kHz 0x17 NACK
+I (2382) oled_i2c_diag: 10 kHz 0x18 NACK
+I (2382) oled_i2c_diag: 10 kHz 0x19 NACK
+I (2392) oled_i2c_diag: 10 kHz 0x1A NACK
+I (2392) oled_i2c_diag: 10 kHz 0x1B NACK
+I (2402) oled_i2c_diag: 10 kHz 0x1C NACK
+I (2402) oled_i2c_diag: 10 kHz 0x1D NACK
+I (2402) oled_i2c_diag: 10 kHz 0x1E NACK
+I (2412) oled_i2c_diag: 10 kHz 0x1F NACK
+I (2412) oled_i2c_diag: 10 kHz 0x20 NACK
+I (2412) oled_i2c_diag: 10 kHz 0x21 NACK
+I (2422) oled_i2c_diag: 10 kHz 0x22 NACK
+I (2422) oled_i2c_diag: 10 kHz 0x23 NACK
+I (2422) oled_i2c_diag: 10 kHz 0x24 NACK
+I (2432) oled_i2c_diag: 10 kHz 0x25 NACK
+I (2432) oled_i2c_diag: 10 kHz 0x26 NACK
+I (2442) oled_i2c_diag: 10 kHz 0x27 NACK
+I (2442) oled_i2c_diag: 10 kHz 0x28 NACK
+I (2442) oled_i2c_diag: 10 kHz 0x29 NACK
+I (2452) oled_i2c_diag: 10 kHz 0x2A NACK
+I (2452) oled_i2c_diag: 10 kHz 0x2B NACK
+I (2452) oled_i2c_diag: 10 kHz 0x2C NACK
+I (2462) oled_i2c_diag: 10 kHz 0x2D NACK
+I (2462) oled_i2c_diag: 10 kHz 0x2E NACK
+I (2462) oled_i2c_diag: 10 kHz 0x2F NACK
+I (2472) oled_i2c_diag: 10 kHz 0x30 NACK
+I (2472) oled_i2c_diag: 10 kHz 0x31 NACK
+I (2482) oled_i2c_diag: 10 kHz 0x32 NACK
+I (2482) oled_i2c_diag: 10 kHz 0x33 NACK
+I (2482) oled_i2c_diag: 10 kHz 0x34 NACK
+I (2492) oled_i2c_diag: 10 kHz 0x35 NACK
+I (2492) oled_i2c_diag: 10 kHz 0x36 NACK
+I (2492) oled_i2c_diag: 10 kHz 0x37 NACK
+I (2502) oled_i2c_diag: 10 kHz 0x38 NACK
+I (2502) oled_i2c_diag: 10 kHz 0x39 NACK
+I (2502) oled_i2c_diag: 10 kHz 0x3A NACK
+I (2512) oled_i2c_diag: 10 kHz 0x3B NACK
+I (2512) oled_i2c_diag: 10 kHz 0x3C NACK
+I (2522) oled_i2c_diag: 10 kHz 0x3D NACK
+I (2522) oled_i2c_diag: 10 kHz 0x3E NACK
+I (2522) oled_i2c_diag: 10 kHz 0x3F NACK
+I (2532) oled_i2c_diag: 10 kHz 0x40 NACK
+I (2532) oled_i2c_diag: 10 kHz 0x41 NACK
+I (2532) oled_i2c_diag: 10 kHz 0x42 NACK
+I (2542) oled_i2c_diag: 10 kHz 0x43 NACK
+I (2542) oled_i2c_diag: 10 kHz 0x44 NACK
+I (2542) oled_i2c_diag: 10 kHz 0x45 NACK
+I (2552) oled_i2c_diag: 10 kHz 0x46 NACK
+I (2552) oled_i2c_diag: 10 kHz 0x47 NACK
+I (2562) oled_i2c_diag: 10 kHz 0x48 NACK
+I (2562) oled_i2c_diag: 10 kHz 0x49 NACK
+I (2562) oled_i2c_diag: 10 kHz 0x4A NACK
+I (2572) oled_i2c_diag: 10 kHz 0x4B NACK
+I (2572) oled_i2c_diag: 10 kHz 0x4C NACK
+I (2572) oled_i2c_diag: 10 kHz 0x4D NACK
+I (2582) oled_i2c_diag: 10 kHz 0x4E NACK
+I (2582) oled_i2c_diag: 10 kHz 0x4F NACK
+I (2582) oled_i2c_diag: 10 kHz 0x50 NACK
+I (2592) oled_i2c_diag: 10 kHz 0x51 NACK
+I (2592) oled_i2c_diag: 10 kHz 0x52 NACK
+I (2602) oled_i2c_diag: 10 kHz 0x53 NACK
+I (2602) oled_i2c_diag: 10 kHz 0x54 NACK
+I (2602) oled_i2c_diag: 10 kHz 0x55 NACK
+I (2612) oled_i2c_diag: 10 kHz 0x56 NACK
+I (2612) oled_i2c_diag: 10 kHz 0x57 NACK
+I (2612) oled_i2c_diag: 10 kHz 0x58 NACK
+I (2622) oled_i2c_diag: 10 kHz 0x59 NACK
+I (2622) oled_i2c_diag: 10 kHz 0x5A NACK
+I (2632) oled_i2c_diag: 10 kHz 0x5B NACK
+I (2632) oled_i2c_diag: 10 kHz 0x5C NACK
+I (2632) oled_i2c_diag: 10 kHz 0x5D NACK
+I (2642) oled_i2c_diag: 10 kHz 0x5E NACK
+I (2642) oled_i2c_diag: 10 kHz 0x5F NACK
+I (2642) oled_i2c_diag: 10 kHz 0x60 NACK
+I (2652) oled_i2c_diag: 10 kHz 0x61 NACK
+I (2652) oled_i2c_diag: 10 kHz 0x62 NACK
+I (2652) oled_i2c_diag: 10 kHz 0x63 NACK
+I (2662) oled_i2c_diag: 10 kHz 0x64 NACK
+I (2662) oled_i2c_diag: 10 kHz 0x65 NACK
+I (2672) oled_i2c_diag: 10 kHz 0x66 NACK
+I (2672) oled_i2c_diag: 10 kHz 0x67 NACK
+I (2672) oled_i2c_diag: 10 kHz 0x68 NACK
+I (2682) oled_i2c_diag: 10 kHz 0x69 NACK
+I (2682) oled_i2c_diag: 10 kHz 0x6A NACK
+I (2682) oled_i2c_diag: 10 kHz 0x6B NACK
+I (2692) oled_i2c_diag: 10 kHz 0x6C NACK
+I (2692) oled_i2c_diag: 10 kHz 0x6D NACK
+I (2692) oled_i2c_diag: 10 kHz 0x6E NACK
+I (2702) oled_i2c_diag: 10 kHz 0x6F NACK
+I (2702) oled_i2c_diag: 10 kHz 0x70 NACK
+I (2712) oled_i2c_diag: 10 kHz 0x71 NACK
+I (2712) oled_i2c_diag: 10 kHz 0x72 NACK
+I (2712) oled_i2c_diag: 10 kHz 0x73 NACK
+I (2722) oled_i2c_diag: 10 kHz 0x74 NACK
+I (2722) oled_i2c_diag: 10 kHz 0x75 NACK
+I (2722) oled_i2c_diag: 10 kHz 0x76 NACK
+I (2732) oled_i2c_diag: 10 kHz 0x77 NACK
+I (2732) oled_i2c_diag: 10 kHz summary: ACK=0 NACK=112 TIMEOUT=0 OTHER=0
+I (2762) oled_i2c_diag: 50 kHz idle: SDA=1 SCL=1
+================IO DUMP Start================
+IO[1] -
+  Pullup: 1, Pulldown: 0, DriveCap: 2
+  InputEn: 1, OutputEn: [periph_sig_ctrl], OpenDrain: 1
+  FuncSel: 1 (GPIO)
+  GPIO Matrix SigOut ID: 90
+  GPIO Matrix SigIn ID: 90
+  SleepSelEn: 1
+
+IO[2] -
+  Pullup: 1, Pulldown: 0, DriveCap: 2
+  InputEn: 1, OutputEn: [periph_sig_ctrl], OpenDrain: 1
+  FuncSel: 1 (GPIO)
+  GPIO Matrix SigOut ID: 89
+  GPIO Matrix SigIn ID: 89
+  SleepSelEn: 1
+
+=================IO DUMP End=================
+I (2792) oled_i2c_diag: 50 kHz 0x08 NACK
+I (2802) oled_i2c_diag: 50 kHz 0x09 NACK
+I (2802) oled_i2c_diag: 50 kHz 0x0A NACK
+I (2802) oled_i2c_diag: 50 kHz 0x0B NACK
+I (2812) oled_i2c_diag: 50 kHz 0x0C NACK
+I (2812) oled_i2c_diag: 50 kHz 0x0D NACK
+I (2812) oled_i2c_diag: 50 kHz 0x0E NACK
+I (2822) oled_i2c_diag: 50 kHz 0x0F NACK
+I (2822) oled_i2c_diag: 50 kHz 0x10 NACK
+I (2822) oled_i2c_diag: 50 kHz 0x11 NACK
+I (2832) oled_i2c_diag: 50 kHz 0x12 NACK
+I (2832) oled_i2c_diag: 50 kHz 0x13 NACK
+I (2842) oled_i2c_diag: 50 kHz 0x14 NACK
+I (2842) oled_i2c_diag: 50 kHz 0x15 NACK
+I (2842) oled_i2c_diag: 50 kHz 0x16 NACK
+I (2852) oled_i2c_diag: 50 kHz 0x17 NACK
+I (2852) oled_i2c_diag: 50 kHz 0x18 NACK
+I (2852) oled_i2c_diag: 50 kHz 0x19 NACK
+I (2862) oled_i2c_diag: 50 kHz 0x1A NACK
+I (2862) oled_i2c_diag: 50 kHz 0x1B NACK
+I (2862) oled_i2c_diag: 50 kHz 0x1C NACK
+I (2872) oled_i2c_diag: 50 kHz 0x1D NACK
+I (2872) oled_i2c_diag: 50 kHz 0x1E NACK
+I (2882) oled_i2c_diag: 50 kHz 0x1F NACK
+I (2882) oled_i2c_diag: 50 kHz 0x20 NACK
+I (2882) oled_i2c_diag: 50 kHz 0x21 NACK
+I (2892) oled_i2c_diag: 50 kHz 0x22 NACK
+I (2892) oled_i2c_diag: 50 kHz 0x23 NACK
+I (2892) oled_i2c_diag: 50 kHz 0x24 NACK
+I (2902) oled_i2c_diag: 50 kHz 0x25 NACK
+I (2902) oled_i2c_diag: 50 kHz 0x26 NACK
+I (2902) oled_i2c_diag: 50 kHz 0x27 NACK
+I (2912) oled_i2c_diag: 50 kHz 0x28 NACK
+I (2912) oled_i2c_diag: 50 kHz 0x29 NACK
+I (2922) oled_i2c_diag: 50 kHz 0x2A NACK
+I (2922) oled_i2c_diag: 50 kHz 0x2B NACK
+I (2922) oled_i2c_diag: 50 kHz 0x2C NACK
+I (2932) oled_i2c_diag: 50 kHz 0x2D NACK
+I (2932) oled_i2c_diag: 50 kHz 0x2E NACK
+I (2932) oled_i2c_diag: 50 kHz 0x2F NACK
+I (2942) oled_i2c_diag: 50 kHz 0x30 NACK
+I (2942) oled_i2c_diag: 50 kHz 0x31 NACK
+I (2942) oled_i2c_diag: 50 kHz 0x32 NACK
+I (2952) oled_i2c_diag: 50 kHz 0x33 NACK
+I (2952) oled_i2c_diag: 50 kHz 0x34 NACK
+I (2962) oled_i2c_diag: 50 kHz 0x35 NACK
+I (2962) oled_i2c_diag: 50 kHz 0x36 NACK
+I (2962) oled_i2c_diag: 50 kHz 0x37 NACK
+I (2972) oled_i2c_diag: 50 kHz 0x38 NACK
+I (2972) oled_i2c_diag: 50 kHz 0x39 NACK
+I (2972) oled_i2c_diag: 50 kHz 0x3A NACK
+I (2982) oled_i2c_diag: 50 kHz 0x3B NACK
+I (2982) oled_i2c_diag: 50 kHz 0x3C NACK
+I (2982) oled_i2c_diag: 50 kHz 0x3D NACK
+I (2992) oled_i2c_diag: 50 kHz 0x3E NACK
+I (2992) oled_i2c_diag: 50 kHz 0x3F NACK
+I (3002) oled_i2c_diag: 50 kHz 0x40 NACK
+I (3002) oled_i2c_diag: 50 kHz 0x41 NACK
+I (3002) oled_i2c_diag: 50 kHz 0x42 NACK
+I (3012) oled_i2c_diag: 50 kHz 0x43 NACK
+I (3012) oled_i2c_diag: 50 kHz 0x44 NACK
+I (3012) oled_i2c_diag: 50 kHz 0x45 NACK
+I (3022) oled_i2c_diag: 50 kHz 0x46 NACK
+I (3022) oled_i2c_diag: 50 kHz 0x47 NACK
+I (3032) oled_i2c_diag: 50 kHz 0x48 NACK
+I (3032) oled_i2c_diag: 50 kHz 0x49 NACK
+I (3032) oled_i2c_diag: 50 kHz 0x4A NACK
+I (3042) oled_i2c_diag: 50 kHz 0x4B NACK
+I (3042) oled_i2c_diag: 50 kHz 0x4C NACK
+I (3042) oled_i2c_diag: 50 kHz 0x4D NACK
+I (3052) oled_i2c_diag: 50 kHz 0x4E NACK
+I (3052) oled_i2c_diag: 50 kHz 0x4F NACK
+I (3052) oled_i2c_diag: 50 kHz 0x50 NACK
+I (3062) oled_i2c_diag: 50 kHz 0x51 NACK
+I (3062) oled_i2c_diag: 50 kHz 0x52 NACK
+I (3072) oled_i2c_diag: 50 kHz 0x53 NACK
+I (3072) oled_i2c_diag: 50 kHz 0x54 NACK
+I (3072) oled_i2c_diag: 50 kHz 0x55 NACK
+I (3082) oled_i2c_diag: 50 kHz 0x56 NACK
+I (3082) oled_i2c_diag: 50 kHz 0x57 NACK
+I (3082) oled_i2c_diag: 50 kHz 0x58 NACK
+I (3092) oled_i2c_diag: 50 kHz 0x59 NACK
+I (3092) oled_i2c_diag: 50 kHz 0x5A NACK
+I (3092) oled_i2c_diag: 50 kHz 0x5B NACK
+I (3102) oled_i2c_diag: 50 kHz 0x5C NACK
+I (3102) oled_i2c_diag: 50 kHz 0x5D NACK
+I (3112) oled_i2c_diag: 50 kHz 0x5E NACK
+I (3112) oled_i2c_diag: 50 kHz 0x5F NACK
+I (3112) oled_i2c_diag: 50 kHz 0x60 NACK
+I (3122) oled_i2c_diag: 50 kHz 0x61 NACK
+I (3122) oled_i2c_diag: 50 kHz 0x62 NACK
+I (3122) oled_i2c_diag: 50 kHz 0x63 NACK
+I (3132) oled_i2c_diag: 50 kHz 0x64 NACK
+I (3132) oled_i2c_diag: 50 kHz 0x65 NACK
+I (3132) oled_i2c_diag: 50 kHz 0x66 NACK
+I (3142) oled_i2c_diag: 50 kHz 0x67 NACK
+I (3142) oled_i2c_diag: 50 kHz 0x68 NACK
+I (3152) oled_i2c_diag: 50 kHz 0x69 NACK
+I (3152) oled_i2c_diag: 50 kHz 0x6A NACK
+I (3152) oled_i2c_diag: 50 kHz 0x6B NACK
+I (3162) oled_i2c_diag: 50 kHz 0x6C NACK
+I (3162) oled_i2c_diag: 50 kHz 0x6D NACK
+I (3162) oled_i2c_diag: 50 kHz 0x6E NACK
+I (3172) oled_i2c_diag: 50 kHz 0x6F NACK
+I (3172) oled_i2c_diag: 50 kHz 0x70 NACK
+I (3172) oled_i2c_diag: 50 kHz 0x71 NACK
+I (3182) oled_i2c_diag: 50 kHz 0x72 NACK
+I (3182) oled_i2c_diag: 50 kHz 0x73 NACK
+I (3192) oled_i2c_diag: 50 kHz 0x74 NACK
+I (3192) oled_i2c_diag: 50 kHz 0x75 NACK
+I (3192) oled_i2c_diag: 50 kHz 0x76 NACK
+I (3202) oled_i2c_diag: 50 kHz 0x77 NACK
+I (3202) oled_i2c_diag: 50 kHz summary: ACK=0 NACK=112 TIMEOUT=0 OTHER=0
+I (3232) oled_i2c_diag: 100 kHz idle: SDA=1 SCL=1
+================IO DUMP Start================
+IO[1] -
+  Pullup: 1, Pulldown: 0, DriveCap: 2
+  InputEn: 1, OutputEn: [periph_sig_ctrl], OpenDrain: 1
+  FuncSel: 1 (GPIO)
+  GPIO Matrix SigOut ID: 90
+  GPIO Matrix SigIn ID: 90
+  SleepSelEn: 1
+
+IO[2] -
+  Pullup: 1, Pulldown: 0, DriveCap: 2
+  InputEn: 1, OutputEn: [periph_sig_ctrl], OpenDrain: 1
+  FuncSel: 1 (GPIO)
+  GPIO Matrix SigOut ID: 89
+  GPIO Matrix SigIn ID: 89
+  SleepSelEn: 1
+
+=================IO DUMP End=================
+I (3262) oled_i2c_diag: 100 kHz 0x08 NACK
+I (3272) oled_i2c_diag: 100 kHz 0x09 NACK
+I (3272) oled_i2c_diag: 100 kHz 0x0A NACK
+I (3272) oled_i2c_diag: 100 kHz 0x0B NACK
+I (3282) oled_i2c_diag: 100 kHz 0x0C NACK
+I (3282) oled_i2c_diag: 100 kHz 0x0D NACK
+I (3282) oled_i2c_diag: 100 kHz 0x0E NACK
+I (3292) oled_i2c_diag: 100 kHz 0x0F NACK
+I (3292) oled_i2c_diag: 100 kHz 0x10 NACK
+I (3302) oled_i2c_diag: 100 kHz 0x11 NACK
+I (3302) oled_i2c_diag: 100 kHz 0x12 NACK
+I (3302) oled_i2c_diag: 100 kHz 0x13 NACK
+I (3312) oled_i2c_diag: 100 kHz 0x14 NACK
+I (3312) oled_i2c_diag: 100 kHz 0x15 NACK
+I (3312) oled_i2c_diag: 100 kHz 0x16 NACK
+I (3322) oled_i2c_diag: 100 kHz 0x17 NACK
+I (3322) oled_i2c_diag: 100 kHz 0x18 NACK
+I (3332) oled_i2c_diag: 100 kHz 0x19 NACK
+I (3332) oled_i2c_diag: 100 kHz 0x1A NACK
+I (3332) oled_i2c_diag: 100 kHz 0x1B NACK
+I (3342) oled_i2c_diag: 100 kHz 0x1C NACK
+I (3342) oled_i2c_diag: 100 kHz 0x1D NACK
+I (3342) oled_i2c_diag: 100 kHz 0x1E NACK
+I (3352) oled_i2c_diag: 100 kHz 0x1F NACK
+I (3352) oled_i2c_diag: 100 kHz 0x20 NACK
+I (3362) oled_i2c_diag: 100 kHz 0x21 NACK
+I (3362) oled_i2c_diag: 100 kHz 0x22 NACK
+I (3362) oled_i2c_diag: 100 kHz 0x23 NACK
+I (3372) oled_i2c_diag: 100 kHz 0x24 NACK
+I (3372) oled_i2c_diag: 100 kHz 0x25 NACK
+I (3372) oled_i2c_diag: 100 kHz 0x26 NACK
+I (3382) oled_i2c_diag: 100 kHz 0x27 NACK
+I (3382) oled_i2c_diag: 100 kHz 0x28 NACK
+I (3382) oled_i2c_diag: 100 kHz 0x29 NACK
+I (3392) oled_i2c_diag: 100 kHz 0x2A NACK
+I (3392) oled_i2c_diag: 100 kHz 0x2B NACK
+I (3402) oled_i2c_diag: 100 kHz 0x2C NACK
+I (3402) oled_i2c_diag: 100 kHz 0x2D NACK
+I (3402) oled_i2c_diag: 100 kHz 0x2E NACK
+I (3412) oled_i2c_diag: 100 kHz 0x2F NACK
+I (3412) oled_i2c_diag: 100 kHz 0x30 NACK
+I (3412) oled_i2c_diag: 100 kHz 0x31 NACK
+I (3422) oled_i2c_diag: 100 kHz 0x32 NACK
+I (3422) oled_i2c_diag: 100 kHz 0x33 NACK
+I (3432) oled_i2c_diag: 100 kHz 0x34 NACK
+I (3432) oled_i2c_diag: 100 kHz 0x35 NACK
+I (3432) oled_i2c_diag: 100 kHz 0x36 NACK
+I (3442) oled_i2c_diag: 100 kHz 0x37 NACK
+I (3442) oled_i2c_diag: 100 kHz 0x38 NACK
+I (3442) oled_i2c_diag: 100 kHz 0x39 NACK
+I (3452) oled_i2c_diag: 100 kHz 0x3A NACK
+I (3452) oled_i2c_diag: 100 kHz 0x3B NACK
+I (3462) oled_i2c_diag: 100 kHz 0x3C NACK
+I (3462) oled_i2c_diag: 100 kHz 0x3D NACK
+I (3462) oled_i2c_diag: 100 kHz 0x3E NACK
+I (3472) oled_i2c_diag: 100 kHz 0x3F NACK
+I (3472) oled_i2c_diag: 100 kHz 0x40 NACK
+I (3472) oled_i2c_diag: 100 kHz 0x41 NACK
+I (3482) oled_i2c_diag: 100 kHz 0x42 NACK
+I (3482) oled_i2c_diag: 100 kHz 0x43 NACK
+I (3492) oled_i2c_diag: 100 kHz 0x44 NACK
+I (3492) oled_i2c_diag: 100 kHz 0x45 NACK
+I (3492) oled_i2c_diag: 100 kHz 0x46 NACK
+I (3502) oled_i2c_diag: 100 kHz 0x47 NACK
+I (3502) oled_i2c_diag: 100 kHz 0x48 NACK
+I (3502) oled_i2c_diag: 100 kHz 0x49 NACK
+I (3512) oled_i2c_diag: 100 kHz 0x4A NACK
+I (3512) oled_i2c_diag: 100 kHz 0x4B NACK
+I (3522) oled_i2c_diag: 100 kHz 0x4C NACK
+I (3522) oled_i2c_diag: 100 kHz 0x4D NACK
+I (3522) oled_i2c_diag: 100 kHz 0x4E NACK
+I (3532) oled_i2c_diag: 100 kHz 0x4F NACK
+I (3532) oled_i2c_diag: 100 kHz 0x50 NACK
+I (3532) oled_i2c_diag: 100 kHz 0x51 NACK
+I (3542) oled_i2c_diag: 100 kHz 0x52 NACK
+I (3542) oled_i2c_diag: 100 kHz 0x53 NACK
+I (3552) oled_i2c_diag: 100 kHz 0x54 NACK
+I (3552) oled_i2c_diag: 100 kHz 0x55 NACK
+I (3552) oled_i2c_diag: 100 kHz 0x56 NACK
+I (3562) oled_i2c_diag: 100 kHz 0x57 NACK
+I (3562) oled_i2c_diag: 100 kHz 0x58 NACK
+I (3562) oled_i2c_diag: 100 kHz 0x59 NACK
+I (3572) oled_i2c_diag: 100 kHz 0x5A NACK
+I (3572) oled_i2c_diag: 100 kHz 0x5B NACK
+I (3582) oled_i2c_diag: 100 kHz 0x5C NACK
+I (3582) oled_i2c_diag: 100 kHz 0x5D NACK
+I (3582) oled_i2c_diag: 100 kHz 0x5E NACK
+I (3592) oled_i2c_diag: 100 kHz 0x5F NACK
+I (3592) oled_i2c_diag: 100 kHz 0x60 NACK
+I (3592) oled_i2c_diag: 100 kHz 0x61 NACK
+I (3602) oled_i2c_diag: 100 kHz 0x62 NACK
+I (3602) oled_i2c_diag: 100 kHz 0x63 NACK
+I (3612) oled_i2c_diag: 100 kHz 0x64 NACK
+I (3612) oled_i2c_diag: 100 kHz 0x65 NACK
+I (3612) oled_i2c_diag: 100 kHz 0x66 NACK
+I (3622) oled_i2c_diag: 100 kHz 0x67 NACK
+I (3622) oled_i2c_diag: 100 kHz 0x68 NACK
+I (3622) oled_i2c_diag: 100 kHz 0x69 NACK
+I (3632) oled_i2c_diag: 100 kHz 0x6A NACK
+I (3632) oled_i2c_diag: 100 kHz 0x6B NACK
+I (3632) oled_i2c_diag: 100 kHz 0x6C NACK
+I (3642) oled_i2c_diag: 100 kHz 0x6D NACK
+I (3642) oled_i2c_diag: 100 kHz 0x6E NACK
+I (3652) oled_i2c_diag: 100 kHz 0x6F NACK
+I (3652) oled_i2c_diag: 100 kHz 0x70 NACK
+I (3652) oled_i2c_diag: 100 kHz 0x71 NACK
+I (3662) oled_i2c_diag: 100 kHz 0x72 NACK
+I (3662) oled_i2c_diag: 100 kHz 0x73 NACK
+I (3662) oled_i2c_diag: 100 kHz 0x74 NACK
+I (3672) oled_i2c_diag: 100 kHz 0x75 NACK
+I (3672) oled_i2c_diag: 100 kHz 0x76 NACK
+I (3682) oled_i2c_diag: 100 kHz 0x77 NACK
+I (3682) oled_i2c_diag: 100 kHz summary: ACK=0 NACK=112 TIMEOUT=0 OTHER=0
+I (3692) oled_i2c_diag: Scan complete

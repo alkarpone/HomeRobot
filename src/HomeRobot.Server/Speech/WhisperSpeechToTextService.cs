@@ -10,7 +10,10 @@ public sealed class WhisperSpeechToTextService(
     private readonly SemaphoreSlim gate = new(1);
     private Process? worker;
 
-    public async Task<string> TranscribeAsync(Stream audio, CancellationToken cancellationToken)
+    public async Task<string> TranscribeAsync(Stream audio, CancellationToken cancellationToken) =>
+        (await TranscribeWithConfidenceAsync(audio, cancellationToken)).Text;
+
+    public async Task<SpeechTranscript> TranscribeWithConfidenceAsync(Stream audio, CancellationToken cancellationToken)
     {
         var options = configuration.Value;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -40,7 +43,8 @@ public sealed class WhisperSpeechToTextService(
 
                 using var result = JsonDocument.Parse(line);
                 if (result.RootElement.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
-                    return text.GetString()!;
+                    return new(text.GetString()!, result.RootElement.TryGetProperty("clearSpeech", out var clear) &&
+                        clear.ValueKind == JsonValueKind.True);
                 if (result.RootElement.TryGetProperty("error", out var error) && error.GetString() == "initialization")
                     throw new SpeechException(503, "Whisper could not load faster-whisper or its local model.");
 
@@ -78,7 +82,7 @@ public sealed class WhisperSpeechToTextService(
             throw new SpeechException(503, "Whisper worker or local model is missing.");
 
         return SpeechProcess.Start(SpeechProcess.ResolveExecutable(options.PythonPath, root), root, "Whisper",
-            "-u", script, model, options.Language, options.Device, options.ComputeType);
+            "-u", script, model, options.Language, options.Device, options.ComputeType, options.InitialPrompt);
     }
 
     private void ResetWorker()

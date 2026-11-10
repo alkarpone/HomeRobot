@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Home Robot · Control Center</title>
+    <link rel="stylesheet" href="/dashboard.css">
+    <script type="module" src="/dashboard.js"></script>
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <aside class="sidebar">
+        <div class="brand"><span class="mark" aria-hidden="true">⌁</span><span>HOME ROBOT<small>CONTROL CENTER</small></span></div>
+        <nav aria-label="Dashboard">
+            <p class="nav-group">WORKSPACE</p>
+            <a href="#overview"><span aria-hidden="true">▦</span>Overview</a>
+            <a href="#ai"><span aria-hidden="true">✦</span>AI &amp; Ollama</a>
+            <a href="#voice"><span aria-hidden="true">≋</span>Voice</a>
+            <a href="#vision"><span aria-hidden="true">◎</span>Vision</a>
+            <a href="#personality"><span aria-hidden="true">◇</span>Personality</a>
+            <a href="#memory"><span aria-hidden="true">▤</span>Memory</a>
+            <p class="nav-group">SYSTEM</p>
+            <a href="#robots"><span aria-hidden="true">⊡</span>Robots</a>
+            <a href="#logs"><span aria-hidden="true">≡</span>Logs</a>
+            <a href="#settings"><span aria-hidden="true">⚙</span>Settings</a>
+        </nav>
+        <p class="sidebar-foot">P10 <span> / </span> SYSTEM CONSOLE</p>
+    </aside>
+    <main id="main" tabindex="-1">
+        <header class="topbar"><span>CONSOLE <span aria-hidden="true">/</span> <strong id="breadcrumb">Overview</strong></span>
+            <span id="connection" class="badge" role="status">Connecting</span></header>
+        <div class="content" id="view"></div>
+        <noscript>This dashboard requires JavaScript.</noscript>
+    </main>
+</body>
+</html>

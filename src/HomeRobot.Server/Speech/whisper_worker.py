@@ -8,7 +8,8 @@ import sys
 
 
 def main():
-    model_path, language, device, compute_type = sys.argv[1:]
+    model_path, language, device, compute_type, *hints = sys.argv[1:]
+    initial_prompt = next(iter(hints), "") or None
     first_request = sys.stdin.readline()
     if not first_request:
         return
@@ -30,10 +31,16 @@ def main():
         try:
             audio = io.BytesIO(base64.b64decode(line.strip(), validate=True))
             segments, info = model.transcribe(
-                audio, language=language, vad_filter=True, condition_on_previous_text=False
+                audio, language=language or None, initial_prompt=initial_prompt,
+                vad_filter=True, condition_on_previous_text=False
             )
-            text = " ".join(s.text.strip() for s in segments).strip() if info.duration_after_vad > 0 else ""
-            result = {"text": text}
+            spoken = [s for s in segments if s.text.strip()] if info.duration_after_vad > 0 else []
+            text = " ".join(s.text.strip() for s in spoken).strip()
+            # Decoder and no-speech scores are heuristics, not calibrated confidence.
+            clear = bool(spoken) and all(
+                s.avg_logprob >= -0.5 and s.no_speech_prob <= 0.3 for s in spoken
+            )
+            result = {"text": text, "clearSpeech": clear}
         except Exception:
             result = {"error": "transcription"}
         print(json.dumps(result))

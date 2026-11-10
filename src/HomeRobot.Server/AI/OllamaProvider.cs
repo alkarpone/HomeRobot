@@ -1,4 +1,6 @@
 using System.Net;
+using System.Text.Json.Serialization;
+using HomeRobot.Server.Dashboard;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
@@ -9,23 +11,35 @@ public sealed class OllamaOptions
     public string BaseUrl { get; set; } = "";
     public string Model { get; set; } = "";
     public int TimeoutSeconds { get; set; }
+    public double? Temperature { get; set; }
+    public int? MaxResponseTokens { get; set; }
 }
 
 public sealed class OllamaProvider(
-    HttpClient client, IOptions<OllamaOptions> options, ILogger<OllamaProvider> logger) : IAIProvider
+    HttpClient client, IOptions<OllamaOptions> options, ILogger<OllamaProvider> logger, DashboardDiagnostics diagnostics) : IAIProvider
 {
     public string Model => options.Value.Model;
 
-    public async Task<string> GenerateAsync(
-        IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken)
+    public Task<string> GenerateAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken) =>
+        GenerateAsync(messages, json: false, cancellationToken);
+
+    public Task<string> GenerateJsonAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken) =>
+        GenerateAsync(messages, json: true, cancellationToken);
+
+    private async Task<string> GenerateAsync(
+        IReadOnlyList<ChatMessage> messages, bool json, CancellationToken cancellationToken)
     {
         if (messages.Count == 0)
             throw new ArgumentException("At least one message is required.", nameof(messages));
 
+        diagnostics.RecordAiRequest();
+        var parameters = new GenerationOptions(options.Value.Temperature, options.Value.MaxResponseTokens);
+        var request = new ChatRequest(Model, messages, false, json ? "json" : null,
+            parameters.Temperature.HasValue || parameters.MaxTokens.HasValue ? parameters : null);
+
         try
         {
-            using var response = await client.PostAsJsonAsync("/api/chat",
-                new { model = Model, messages, stream = false }, cancellationToken);
+            using var response = await client.PostAsJsonAsync("/api/chat", request, cancellationToken);
             if (response.StatusCode == HttpStatusCode.NotFound)
                 throw Failure(503, "Configured Ollama model is unavailable.");
             if (!response.IsSuccessStatusCode)
@@ -88,6 +102,13 @@ public sealed class OllamaProvider(
         logger.LogWarning("{OllamaFailure}", message);
         return new AIProviderException(statusCode, message);
     }
+
+    private sealed record ChatRequest(string Model, IReadOnlyList<ChatMessage> Messages, bool Stream,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Format,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] GenerationOptions? Options);
+    private sealed record GenerationOptions(
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] double? Temperature,
+        [property: JsonPropertyName("num_predict"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? MaxTokens);
 
     private sealed record ChatResult(Reply? Message);
     private sealed record Reply(string? Role, string? Content);

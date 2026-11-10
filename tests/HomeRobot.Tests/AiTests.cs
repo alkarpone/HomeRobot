@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using HomeRobot.Server.AI;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -18,7 +19,9 @@ public sealed class AiTests : IDisposable
     public AiTests()
     {
         factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services =>
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Ollama:BaseUrl"] = "http://ollama.test:11434" }))
+            .ConfigureServices(services =>
             {
                 services.AddSingleton<TimeProvider>(clock);
                 services.AddHttpClient<OllamaProvider>().ConfigurePrimaryHttpMessageHandler(() => ollama);
@@ -27,12 +30,22 @@ public sealed class AiTests : IDisposable
     }
 
     [Fact]
+    public async Task StructuredRequestUsesConfiguredRemoteProvider()
+    {
+        var provider = factory.Services.GetRequiredService<IAIProvider>();
+        await provider.GenerateJsonAsync([new("user", "Turn right 90 degrees.")], CancellationToken.None);
+
+        Assert.Equal("json", ollama.Format);
+    }
+
+    [Fact]
     public async Task ChatCreatesSessionAndReusesContext()
     {
         var first = await ChatAsync("Ahoj");
         Assert.NotEqual(Guid.Empty, first.SessionId);
         Assert.Equal("Hello!", first.Response);
-        Assert.Equal("qwen3:8b", first.Model);
+        Assert.Equal("robot-ai", first.Model);
+        Assert.Null(ollama.Format);
         Assert.Equal(new[] { "system", "user" }, ollama.Messages.Select(message => message.Role));
 
         var second = await ChatAsync("Continue", first.SessionId);
@@ -83,7 +96,7 @@ public sealed class AiTests : IDisposable
         ollama.Disconnected = true;
         using var response = await client.PostAsJsonAsync("/api/ai/chat", new { message = "Hello" });
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal(new OllamaStatus(false, "qwen3:8b", false), await StatusAsync());
+        Assert.Equal(new OllamaStatus(false, "robot-ai", false), await StatusAsync());
     }
 
     [Theory]
@@ -92,7 +105,7 @@ public sealed class AiTests : IDisposable
     public async Task DiagnosticsReportWhetherTheConfiguredModelIsInstalled(bool installed)
     {
         ollama.Installed = installed;
-        Assert.Equal(new OllamaStatus(installed, "qwen3:8b", true), await StatusAsync());
+        Assert.Equal(new OllamaStatus(installed, "robot-ai", true), await StatusAsync());
     }
 
     [Fact]
@@ -137,17 +150,19 @@ public sealed class AiTests : IDisposable
         public bool Disconnected { get; set; }
         public bool Installed { get; set; }
         public bool InvalidReply { get; set; }
+        public string? Format { get; private set; }
         public IReadOnlyList<ChatMessage> Messages { get; private set; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
+            Assert.Equal("http://ollama.test:11434", request.RequestUri!.GetLeftPart(UriPartial.Authority));
             if (Disconnected)
                 throw new HttpRequestException(HttpRequestError.ConnectionError, "Test connection refused.");
 
             if (request.RequestUri!.AbsolutePath == "/api/tags")
             {
                 Assert.Equal(HttpMethod.Get, request.Method);
-                var name = Installed ? "qwen3:8b" : "another-model:latest";
+                var name = Installed ? "robot-ai:latest" : "another-model:latest";
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = JsonContent.Create(new { models = new[] { new { name } } })
@@ -158,7 +173,8 @@ public sealed class AiTests : IDisposable
             Assert.Equal(HttpMethod.Post, request.Method);
             using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(token));
             Assert.False(body.RootElement.GetProperty("stream").GetBoolean());
-            Assert.Equal("qwen3:8b", body.RootElement.GetProperty("model").GetString());
+            Assert.Equal("robot-ai", body.RootElement.GetProperty("model").GetString());
+            Format = body.RootElement.TryGetProperty("format", out var format) ? format.GetString() : null;
             Messages = body.RootElement.GetProperty("messages").EnumerateArray()
                 .Select(message => new ChatMessage(
                     message.GetProperty("role").GetString()!, message.GetProperty("content").GetString()!))

@@ -1,4 +1,5 @@
 using HomeRobot.Server.AI;
+using HomeRobot.Server.Memory;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -19,11 +20,12 @@ public sealed class AiController(
         try
         {
             var result = await conversations.ReplyAsync(
-                request.SessionId, new ChatMessage("user", request.Message), provider, cancellationToken);
+                request.SessionId, new ChatMessage("user", request.Message), provider, cancellationToken, briefCzech: request.BriefCzech,
+                localMemory: MemoryAccess.IsLocal(HttpContext));
             if (result is not { } reply)
                 return Problem(statusCode: 503, title: "Conversation capacity reached.");
 
-            return Ok(new { sessionId = reply.SessionId, response = reply.Response, model = options.Value.Model });
+            return Ok(new { sessionId = reply.SessionId, response = reply.Response, expression = reply.Expression, model = options.Value.Model });
         }
         catch (AIProviderException ex)
         {
@@ -35,5 +37,5 @@ public sealed class AiController(
     public Task<OllamaStatus> Status([FromServices] OllamaProvider ollama, CancellationToken cancellationToken) =>
         ollama.GetStatusAsync(cancellationToken);
 
-    public sealed record ChatRequest(string? Message, Guid? SessionId);
+    public sealed record ChatRequest(string? Message, Guid? SessionId, bool BriefCzech = false);
 }

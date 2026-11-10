@@ -9,14 +9,22 @@ internal static class WavAudio
 
     public static bool TryValidate(ReadOnlySpan<byte> wav, out bool silent)
     {
-        silent = false;
+        var valid = TryReadPcm(wav, out var samples, out _, out _);
+        silent = valid && samples.IndexOfAnyExcept((byte)0) < 0;
+        return valid;
+    }
+
+    public static bool TryReadPcm(ReadOnlySpan<byte> wav, out ReadOnlySpan<byte> samples,
+        out int sampleRate, out int channels)
+    {
+        samples = default;
+        sampleRate = channels = 0;
         if (wav.Length < 44 || !wav[..4].SequenceEqual("RIFF"u8) ||
             Read32(wav[4..]) != wav.Length - 8 || !wav[8..12].SequenceEqual("WAVE"u8))
             return false;
 
         uint bytesPerSecond = 0;
         ushort alignment = 0;
-        ReadOnlySpan<byte> samples = default;
         var remaining = wav[12..];
         while (!remaining.IsEmpty)
         {
@@ -34,7 +42,7 @@ internal static class WavAudio
                 if (bytesPerSecond != 0 || chunk.Length < 16 || Read16(chunk) != 1)
                     return false;
 
-                var channels = Read16(chunk[2..]);
+                channels = Read16(chunk[2..]);
                 var rate = Read32(chunk[4..]);
                 bytesPerSecond = Read32(chunk[8..]);
                 alignment = Read16(chunk[12..]);
@@ -42,6 +50,7 @@ internal static class WavAudio
                     Read16(chunk[14..]) != 16 || alignment != channels * 2 ||
                     bytesPerSecond != rate * alignment)
                     return false;
+                sampleRate = (int)rate;
             }
             else if (remaining[..4].SequenceEqual("data"u8))
             {
@@ -54,11 +63,7 @@ internal static class WavAudio
             remaining = remaining[(8 + (int)paddedLength)..];
         }
 
-        if (samples.IsEmpty || samples.Length % alignment != 0 || samples.Length > bytesPerSecond * MaxSeconds)
-            return false;
-
-        silent = samples.IndexOfAnyExcept((byte)0) < 0;
-        return true;
+        return !samples.IsEmpty && samples.Length % alignment == 0 && samples.Length <= bytesPerSecond * MaxSeconds;
     }
 
     private static uint Read32(ReadOnlySpan<byte> bytes) => BinaryPrimitives.ReadUInt32LittleEndian(bytes);

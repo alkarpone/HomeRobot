@@ -3,6 +3,9 @@ namespace HomeRobot.Server.AI;
 public interface IAIProvider
 {
     Task<string> GenerateAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken);
+
+    Task<string> GenerateJsonAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken) =>
+        GenerateAsync(messages, cancellationToken);
 }
 
 public sealed record ChatMessage
@@ -16,6 +19,9 @@ public sealed record ChatMessage
         Role = role;
         Content = content;
     }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Images { get; init; }
 
     public string Role { get; }
     public string Content { get; }

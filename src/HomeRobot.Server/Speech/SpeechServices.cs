@@ -3,7 +3,12 @@ namespace HomeRobot.Server.Speech;
 public interface ISpeechToTextService
 {
     Task<string> TranscribeAsync(Stream audio, CancellationToken cancellationToken);
+
+    async Task<SpeechTranscript> TranscribeWithConfidenceAsync(Stream audio, CancellationToken cancellationToken) =>
+        new(await TranscribeAsync(audio, cancellationToken), false);
 }
+
+public sealed record SpeechTranscript(string Text, bool ClearSpeech);
 
 public interface ITextToSpeechService
 {
@@ -19,6 +24,7 @@ public sealed class WhisperOptions
 {
     public string PythonPath { get; set; } = "python3";
     public string WorkerPath { get; set; } = "";
+    public string InitialPrompt { get; set; } = "";
     public string Language { get; set; } = "cs";
     public string ModelPath { get; set; } = "models/stt/small";
     public string Device { get; set; } = "cpu";

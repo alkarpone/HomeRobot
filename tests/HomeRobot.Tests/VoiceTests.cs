@@ -139,6 +139,56 @@ public sealed class VoiceTests : IDisposable
         Assert.Equal("Příliš žluťoučký kůň.", speech.Synthesized);
     }
 
+    [Theory]
+    [InlineData("Kolik je dva plus dva?", true, "conversation")]
+    [InlineData("Otoč se doprava o 90 stupňů rychlostí 30 %.", true, "action")]
+    [InlineData("Otoč se doprava o 90 stupňů.", true, "action")]
+    [InlineData("Otoč se do prava o 90° na 30 %", true, "action")]
+    [InlineData("Otoč se doprava o 90 stupňů na 30 %.", false, "unclear")]
+    [InlineData("Otoč se doprava o 90 stupňů rychlostí hodně procent.", true, "clarification_required")]
+    [InlineData("Otoč se doprava.", true, "clarification_required")]
+    [InlineData("Otoč se doleva o 20 stupňů a jeď dopředu.", true, "clarification_required")]
+    [InlineData("Nejezdi dopředu", true, "ambiguous")]
+    [InlineData("Neotáčej se doprava o 90 stupňů na 30 %", true, "ambiguous")]
+    [InlineData("Nezastavuj", true, "ambiguous")]
+    [InlineData("Jeď někam", true, "ambiguous")]
+    [InlineData("Vrať se do kuchyně", true, "unsupported")]
+    [InlineData("Odbols doprava", true, "clarification_required")]
+    [InlineData("Popojet padesát centimetrů", true, "clarification_required")]
+    [InlineData("Mám kočku a psa.", true, "conversation")]
+    [InlineData("Zastav?", true, "ambiguous")]
+    [InlineData("Zastav.", true, "stop")]
+    [InlineData("???", true, "invalid")]
+    [InlineData("", true, "invalid")]
+    public async Task VoiceRoutesTranscriptionsWithoutCallingAi(string text, bool clear, string route)
+    {
+        speech.Transcription = text;
+        speech.ClearSpeech = clear;
+        using var response = await UploadAsync("transcribe", Wav());
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(route, result.GetProperty("route").GetString());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("voiceTurn").ValueKind);
+        Assert.Empty(speech.Messages);
+        Assert.Null(speech.Synthesized);
+    }
+
+    [Fact]
+    public async Task BriefVoiceConversationReusesChatAndKeepsReplyWhenPiperFails()
+    {
+        using var chat = await client.PostAsJsonAsync("/api/ai/chat", new { message = "Jak se máš?", briefCzech = true });
+        chat.EnsureSuccessStatusCode();
+        var result = await chat.Content.ReadFromJsonAsync<JsonElement>();
+        var reply = result.GetProperty("response").GetString();
+        Assert.Equal("Mám se dobře.", reply);
+        Assert.Contains("Never claim to have executed an action", speech.Messages[0]);
+
+        speech.TtsError = 503;
+        using var synthesis = await client.PostAsJsonAsync("/api/voice/synthesize", new { text = reply });
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, synthesis.StatusCode);
+        Assert.Equal(reply, speech.Synthesized);
+    }
+
     private async Task<HttpResponseMessage> UploadAsync(string endpoint, byte[]? wav, string? sessionId = null)
     {
         using var form = new MultipartFormDataContent();
@@ -149,7 +199,7 @@ public sealed class VoiceTests : IDisposable
         return await client.PostAsync($"/api/voice/{endpoint}", form);
     }
 
-    private static byte[] Wav(int samples = 160, short encoding = 1, short sample = 100)
+    internal static byte[] Wav(int samples = 160, short encoding = 1, short sample = 100)
     {
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream, Encoding.ASCII);
@@ -180,6 +230,7 @@ public sealed class VoiceTests : IDisposable
     {
         public int Transcriptions { get; private set; }
         public string Transcription { get; set; } = "Jak se máš?";
+        public bool ClearSpeech { get; set; }
         public int? SttError { get; set; }
         public int? TtsError { get; set; }
         public string? Synthesized { get; private set; }
@@ -192,6 +243,9 @@ public sealed class VoiceTests : IDisposable
                 ? Task.FromException<string>(new SpeechException(status, "Whisper error."))
                 : Task.FromResult(Transcription);
         }
+
+        public async Task<SpeechTranscript> TranscribeWithConfidenceAsync(Stream audio, CancellationToken cancellationToken) =>
+            new(await TranscribeAsync(audio, cancellationToken), ClearSpeech);
 
         public Task<byte[]> SynthesizeAsync(string text, CancellationToken cancellationToken)
         {
