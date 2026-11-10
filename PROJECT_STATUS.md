@@ -5,6 +5,7 @@
 - **Scope** — macOS simulator, validated robot commands, Czech voice routing, personality and memory, vision, web dashboard, and ESP32-S3 camera, OLED, speaker and microphone firmware.
 - **Verification** — All 169 .NET tests passed. Dashboard JavaScript syntax validation passed. Two preserved serial-capture lines contain trailing whitespace. macOS and ESP32 builds were not rerun for this checkpoint.
 - **Repository contents** — Include Xcode user state and pin the ESP-IDF checkout as a Git submodule alongside all project changes.
+- **History integration** — Reviewed and merged the remote P6-A checkpoint. Conflicting P6-era implementations are superseded by the current tested voice, memory, vision and dashboard implementation.
 
 ## ESP32-S3 I2S microphone input
 
@@ -129,6 +130,7 @@
 
 ## P6-A — AI Command Engine
 
+- **Git scope** — The milestone commit combines the P4 robot protocol, P5 macOS simulator, and P6-A AI command engine.
 - **Completed** — Czech and English command interpretation through the P2 provider, strict JSON and P4 validation, and hosted sequential execution with per-action status. P4 emergency stop cancels plans, including during interpretation.
 - **Verification** — The .NET 10 solution built with zero warnings and all 62 tests passed, including 16 cases with a mocked AI provider and in-process WebSocket peers. On macOS ARM64, eight Swift tests passed and the optional live P4 test was skipped.
 - **Limitations** — Plans are in memory and robot endpoints are unauthenticated. Automated coverage verifies server behavior with simulated AI output.
