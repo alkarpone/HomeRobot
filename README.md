@@ -298,3 +298,11 @@ With the simulator connected, record “Co vidíš?” or “Rozhlédni se” in
 **Auto Scan** is off at launch. Enable it in **Vision** and select 10, 15, 30 or 60 seconds (default 30). Change detection is on by default with a 3.5% threshold. It compares a small grayscale sample against the last successful scan and can miss small or color-only changes or react to camera movement. Explicit requests always run inference. Scan results stay silent and do not dispatch robot actions. Disabling Auto Scan cancels the scan and leaves the preview available until **Stop Camera** or window closure. Diagnostics show timestamps, counts, change score, inference time and visual context age.
 
 `POST /api/vision/analyze` accepts a Base64 JPEG/PNG up to 2 MiB and 4096 × 4096 pixels, an optional question of up to 500 characters, a UUID `sessionId`, and an optional ISO 8601 `capturedAt`. Omit `image` and use the returned `sessionId` to ask about the cached image. Set `scan: true` for stateless analysis. Configure the context lifetime with `Vision:ContextLifetimeSeconds` (default 120, range 1–600). `DELETE /api/vision/{sessionId}` clears the context. The API requires direct loopback access. Images stay in RAM, travel only to the configured Ollama endpoint for inference, and are never written to SQLite. Recognition, counts and OCR can be wrong, and voice routing covers common Czech phrases.
+## Dual audio output (P13-A)
+
+The macOS simulator's **Audio Output** panel independently enables Mac and ESP32
+speakers, selects the physical robot and shows playback diagnostics. **Conversation
+prompt → Send** and existing microphone turns use the same AI response and one Piper
+synthesis. Mac playback/lip sync retain the original WAV; the ESP32 streams converted
+16 kHz PCM through its existing SpeakerManager and I2S configuration. P10's **Robots**
+view adds **Test Speaker**. See [ESP32 TTS setup, build/flash and hardware verification](docs/ESP32_TTS.md).

@@ -85,12 +85,24 @@ buffers one PCM clip of up to 30 seconds in PSRAM, applies per-clip volume, and
 copies mono samples to both I2S slots. A competing request receives HTTP 409.
 See the [wiring and HTTP contract](HARDWARE.md).
 
-HomeRobot.Server registers `Esp32SpeakerClient` for explicit calls with a known
-device address. Pass it the WAV returned by `ITextToSpeechService`. The client
-reads the actual WAV sample rate, downmixes stereo if needed, resamples to
-16 kHz and posts raw mono PCM16 little-endian data. HTTP 202 acknowledges
-acceptance. Existing voice clients retain their WAV responses, and callers
-choose when to send speech to the ESP32.
+HomeRobot.Server reuses `Esp32SpeakerClient`'s WAV parsing, downmixing and conversion
+into 16 kHz mono PCM16 little-endian. P13-A sends that PCM through short-lived,
+command-scoped HTTPS resources held by `AudioPlaybackService`. The original WAV
+returns to the Mac from the same synthesis. Both outputs use one Piper call.
+The existing direct HTTP speaker client and firmware upload routes remain available.
+
+An optional ESP32 WSS client registers through the existing P4 registry and heartbeat
+with audio-only capabilities. `audio_play` and targeted `audio_stop` use the existing
+command/ack/result envelopes, with a separate 45-second audio deadline. The device
+streams fixed-length authenticated downloads into SpeakerManager's existing DMA/I2S
+write path in bounded blocks. A separate control task keeps heartbeats and cancellation
+responsive. Disconnect cancels playback and reconnect starts a fresh session.
+
+The simulator persists output toggles and device selection, polls P4 audio status,
+and routes text, microphone and Vision replies through its existing synthesis/player.
+Mac errors and remote errors are independent. Pending playback IDs let a stop suppress
+late delivery during synthesis. P10 exposes physical speaker diagnostics and a Piper
+test. See [setup, limits and hardware verification](docs/ESP32_TTS.md).
 
 ## ESP32-S3 microphone input
 

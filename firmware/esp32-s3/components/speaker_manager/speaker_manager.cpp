@@ -34,6 +34,8 @@ constexpr int64_t upload_timeout_us = 8'000'000;
 
 i2s_chan_handle_t tx;
 std::atomic<bool> busy{false};
+std::atomic<bool> cancelled{false};
+std::atomic<bool> streaming{false};
 volatile uint32_t underruns; // Written by the I2S ISR. Read and reset with TX disabled.
 
 bool IRAM_ATTR on_send_queue_overflow(i2s_chan_handle_t, i2s_event_data_t *, void *)
@@ -54,7 +56,8 @@ esp_err_t write_frames(const int16_t (&stereo)[frames_per_buffer * 2])
     return err == ESP_OK ? ESP_FAIL : err;
 }
 
-esp_err_t play(const int16_t *pcm, size_t frames, unsigned volume)
+esp_err_t play(const int16_t *pcm, size_t frames, unsigned volume,
+               speaker_reader_t reader = nullptr, speaker_started_t started = nullptr, void *context = nullptr)
 {
     int16_t stereo[frames_per_buffer * 2]{};
     // Start with 40 ms of silence and clear stale DMA data from any failed job.
@@ -66,18 +69,25 @@ esp_err_t play(const int16_t *pcm, size_t frames, unsigned volume)
         }
     }
     ESP_LOGI(tag, "Playback start: %s, %zu frames, volume %u%%",
-             pcm ? "PCM" : "440 Hz test tone", frames, volume);
+             reader ? "streamed PCM" : pcm ? "PCM" : "440 Hz test tone", frames, volume);
     underruns = 0;
     esp_err_t err = i2s_channel_enable(tx);
     if (err != ESP_OK) {
         return err;
     }
 
+    int16_t chunk[frames_per_buffer];
     for (size_t offset = 0; offset < frames && err == ESP_OK; offset += frames_per_buffer) {
+        if (cancelled.load()) { err = ESP_ERR_INVALID_STATE; break; }
         const size_t count = std::min(frames_per_buffer, frames - offset);
+        if (reader) {
+            err = reader(context, chunk, count);
+            if (err != ESP_OK || cancelled.load()) { err = ESP_FAIL; break; }
+            if (offset == 0 && started) started(context);
+        }
         for (size_t i = 0; i < count; ++i) {
             const size_t frame = offset + i;
-            const int sample = pcm ? pcm[frame] :
+            const int sample = reader ? chunk[i] : pcm ? pcm[frame] :
                 static_cast<int>(tone_peak * std::sin(2.0f * 3.14159265f *
                     ((frame * tone_hz) % sample_rate) / sample_rate));
             stereo[i * 2] = stereo[i * 2 + 1] = sample * static_cast<int>(volume) / 100;
@@ -208,6 +218,7 @@ esp_err_t submit(httpd_req_t *req)
         return reply(req, "409 Conflict", "Speaker is busy", bytes != 0);
     }
 
+    cancelled.store(false);
     auto *job = static_cast<PlaybackRequest *>(malloc(sizeof(PlaybackRequest)));
     if (job && httpd_req_async_handler_begin(req, &job->http) == ESP_OK) {
         job->volume = volume;
@@ -223,6 +234,22 @@ esp_err_t submit(httpd_req_t *req)
 }
 
 } // namespace
+
+bool speaker_available(void) { return tx != nullptr; }
+
+void speaker_cancel(void) { if (streaming.load()) cancelled.store(true); }
+
+esp_err_t speaker_stream(size_t frames, speaker_reader_t reader, speaker_started_t started, void *context)
+{
+    if (!tx || !reader || frames == 0 || frames > max_pcm_bytes / sizeof(int16_t)) return ESP_ERR_INVALID_ARG;
+    if (busy.exchange(true)) return ESP_ERR_INVALID_STATE;
+    cancelled.store(false);
+    streaming.store(true);
+    const esp_err_t err = play(nullptr, frames, default_volume, reader, started, context);
+    streaming.store(false);
+    busy.store(false);
+    return err;
+}
 
 esp_err_t speaker_init(void)
 {

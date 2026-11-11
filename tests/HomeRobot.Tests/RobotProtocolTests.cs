@@ -28,6 +28,7 @@ public sealed partial class RobotProtocolTests : IDisposable
                 services.AddSingleton<TimeProvider>(clock);
                 services.AddSingleton<IAIProvider>(ai);
                 services.AddSingleton<ISpeechToTextService>(robotVoice);
+                services.AddSingleton<ITextToSpeechService>(audioTts);
             }));
         client = factory.CreateClient();
     }

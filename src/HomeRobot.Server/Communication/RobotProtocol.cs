@@ -39,6 +39,7 @@ public sealed record RobotDetails(
     public DateTimeOffset? LastHeartbeat { get; init; }
     public DateTimeOffset? LastTelemetry { get; init; }
     public RobotCommandStatus? LastExecutedCommand { get; init; }
+    public AudioPlaybackStatus? Audio { get; init; }
 }
 
 public sealed record RobotCommandStatus(
@@ -60,6 +61,10 @@ internal sealed record MoveParameters(double DistanceCm, double Speed);
 internal sealed record RotateParameters(double AngleDegrees, double Speed);
 internal sealed record ExpressionParameters(string Expression);
 internal sealed record EmptyParameters;
+public sealed record AudioPlaybackStatus(string PlaybackId, string Status, string? Error);
+internal sealed record AudioPlayParameters(string PlaybackId, string Resource, string Token,
+    int SampleRate, int Channels, int BitsPerSample, int ByteLength, string Encoding = "pcm_s16le");
+internal sealed record AudioStopParameters(string PlaybackId);
 
 internal sealed record RobotCommand(string Command, object Parameters)
 {
@@ -76,6 +81,10 @@ internal sealed record RobotCommand(string Command, object Parameters)
             rotate.Speed > 0 && rotate.Speed <= limits.MaxSpeed,
         ("set_expression", ExpressionParameters expression) => RobotProtocol.IsIdentifier(expression.Expression),
         ("stop", EmptyParameters) => true,
+        ("audio_play", AudioPlayParameters audio) => RobotProtocol.IsIdentifier(audio.PlaybackId) &&
+            audio.SampleRate == 16000 && audio.Channels == 1 && audio.BitsPerSample == 16 &&
+            audio.Encoding == "pcm_s16le" && audio.ByteLength is > 0 and <= 960000 && audio.ByteLength % 2 == 0,
+        ("audio_stop", AudioStopParameters audio) => RobotProtocol.IsIdentifier(audio.PlaybackId),
         _ => false
     };
 
@@ -96,6 +105,8 @@ internal sealed record RobotCommand(string Command, object Parameters)
                     when parameters.Deserialize<RotateParameters>(RobotProtocol.Json) is { } rotate => new(request.Command, rotate),
                 "set_expression"
                     when parameters.Deserialize<ExpressionParameters>(RobotProtocol.Json) is { } expression => new(request.Command, expression),
+                "audio_stop" when parameters.Deserialize<AudioStopParameters>(RobotProtocol.Json) is { } audioStop =>
+                    new(request.Command, audioStop),
                 "stop" when parameters.Deserialize<EmptyParameters>(RobotProtocol.Json) is { } stop =>
                     new(request.Command, stop),
                 _ => null

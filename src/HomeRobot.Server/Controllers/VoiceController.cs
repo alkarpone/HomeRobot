@@ -68,7 +68,8 @@ public sealed class VoiceController(
     [RequestSizeLimit(64 * 1024)]
     public async Task<IActionResult> Synthesize(SynthesisRequest request,
         [FromServices] DashboardDiagnostics diagnostics, [FromServices] ILogger<VoiceController> logger,
-        CancellationToken cancellationToken)
+        [FromServices] AudioPlaybackService playback, [FromServices] Esp32SpeakerClient speaker,
+        [FromServices] IConfiguration settings, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 8000)
             return Problem(statusCode: 400, title: "Text must contain 1 to 8000 characters.");
@@ -78,6 +79,35 @@ public sealed class VoiceController(
             var wave = await tts.SynthesizeAsync(request.Text, cancellationToken);
             diagnostics.RecordSpeech(false, "ready");
             logger.LogInformation("Piper sample synthesis completed.");
+            if (settings.GetValue<bool>("Speech:Esp32:Enabled"))
+            {
+                try
+                {
+                    if (!Uri.TryCreate(settings["Speech:Esp32:BaseUrl"], UriKind.Absolute, out var address) ||
+                        address.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(address.UserInfo) ||
+                        address.AbsolutePath != "/" || !string.IsNullOrEmpty(address.Query) || !string.IsNullOrEmpty(address.Fragment))
+                        throw new ArgumentException("Invalid ESP32 speaker address.");
+                    await speaker.PlayWavAsync(address, wave, settings.GetValue<int?>("Speech:Esp32:Volume"), cancellationToken);
+                    Response.Headers["X-Esp32-Audio"] = "accepted";
+                }
+                catch (Exception ex) when (ex is HttpRequestException or ArgumentException ||
+                    ex is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+                {
+                    Response.Headers["X-Esp32-Audio"] = "error";
+                    logger.LogWarning("ESP32 HTTP audio delivery failed.");
+                }
+            }
+            else if (request.Esp32RobotId is { } robotId)
+            {
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var result = playback.Play(robotId, wave, request.PlaybackId);
+                    if (result.PlaybackId is { } id) Response.Headers["X-Playback-Id"] = id;
+                    if (result.Error is { } error) Response.Headers["X-Audio-Error"] = error;
+                }
+                catch (ArgumentException) { Response.Headers["X-Audio-Error"] = "unsupported_audio_format"; }
+            }
             return File(wave, "audio/wav");
         }
         catch (SpeechException ex)
@@ -165,5 +195,5 @@ public sealed class VoiceController(
         return result with { Text = result.Text.Trim() };
     }
 
-    public sealed record SynthesisRequest(string? Text);
+    public sealed record SynthesisRequest(string? Text, string? Esp32RobotId = null, string? PlaybackId = null);
 }

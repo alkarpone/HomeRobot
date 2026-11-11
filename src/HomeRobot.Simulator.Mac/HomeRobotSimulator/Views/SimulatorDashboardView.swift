@@ -4,11 +4,13 @@ struct SimulatorDashboardView: View {
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var robot: RobotConnectionService
     @StateObject private var voice = VoiceInteraction()
+    @State private var textPrompt = ""
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 ConnectionStatusView(robot: robot)
+                panel("Audio Output") { audioControls }
                 panel("Voice") { voiceControls }
                 panel("Vision") { VisionView(vision: voice.vision, voice: voice, robot: robot) }
                 HStack(spacing: 16) {
@@ -48,6 +50,14 @@ struct SimulatorDashboardView: View {
             .padding(12)
             .background(.regularMaterial)
         }
+        .task(id: robot.serverURL) {
+            while !Task.isCancelled {
+                await voice.refreshSpeakers(robot: robot)
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+            }
+        }
+        .onChange(of: voice.macOutput) { _, enabled in if !enabled { voice.stopMacPlayback() } }
+        .onChange(of: voice.esp32Output) { _, enabled in if !enabled { voice.stopEsp32Playback(robot: robot) } }
         .onChange(of: robot.connectionState) { _, state in
             if state != .connected { voice.disconnected() }
         }
@@ -55,14 +65,43 @@ struct SimulatorDashboardView: View {
             if robot.lastCommand?.name == "set_expression", robot.lastCommand?.phase == .completed { voice.clearConversationalExpression() }
         }
         .onDisappear {
-            voice.cancel()
+            voice.stopPlayback(robot: robot)
             voice.vision.close()
             robot.disconnect()
         }
     }
 
+    private var audioControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Mac Speakers", isOn: $voice.macOutput)
+            Toggle("ESP32 Speaker", isOn: $voice.esp32Output)
+            Picker("Physical robot", selection: $voice.selectedSpeaker) {
+                Text(voice.selectedSpeaker.isEmpty ? "No speaker" : voice.selectedSpeaker + " (saved)")
+                    .tag(voice.selectedSpeakerDetails == nil ? voice.selectedSpeaker : "")
+                ForEach(voice.speakers) { Text($0.name).tag($0.robotId) }
+            }
+            Text("Mac: \(voice.macPlaybackState)")
+            if let speaker = voice.speakerDiagnostics {
+                Text("ESP32: \(voice.selectedSpeakerDetails == nil ? "disconnected" : "connected") · audio_output, tts_playback, audio_stop · \(speaker.audio?.status ?? "idle")")
+                if let error = speaker.audio?.error { Text(error).foregroundStyle(.orange) }
+            } else { Text("ESP32: disconnected") }
+            if let error = voice.audioError { Text(error).foregroundStyle(.orange) }
+            HStack {
+                Button("Stop Mac") { voice.stopMacPlayback() }
+                Button("Stop ESP32") { voice.stopEsp32Playback(robot: robot) }
+                Button("Stop Playback") { voice.stopPlayback(robot: robot) }
+            }
+        }
+    }
+
     private var voiceControls: some View {
         VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                TextField("Conversation prompt", text: $textPrompt)
+                    .onSubmit { voice.submitText(textPrompt, robot: robot) }
+                Button("Send") { voice.submitText(textPrompt, robot: robot) }
+                    .disabled(voice.busy || textPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || robot.voiceAPI == nil)
+            }
             HStack {
                 Button {
                     if voice.phase == .listening {
@@ -78,7 +117,7 @@ struct SimulatorDashboardView: View {
                 .tint(voice.phase == .listening ? .red : .accentColor)
                 .disabled(voice.phase != .listening && (voice.busy || robot.voiceAPI == nil))
                 Text(voice.requestingPermission ? "Microphone permission" : voice.phase.rawValue)
-                if voice.phase == .speaking { Button("Cancel playback") { voice.cancel() } }
+                if voice.phase == .speaking { Button("Cancel playback") { voice.stopPlayback(robot: robot) } }
             }
             if !voice.transcription.isEmpty { Text("Raw Whisper: \(voice.transcription)").textSelection(.enabled) }
             if !voice.correctedText.isEmpty { Text("Corrected: \(voice.correctedText)").textSelection(.enabled) }

@@ -4,3 +4,6 @@
 /sdkconfig.old
 /wifi.local.json
 /.env
+
+/server.local.json
+/*.local.pem

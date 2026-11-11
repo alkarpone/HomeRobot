@@ -26,13 +26,119 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
     @Published private(set) var totalMs: Int?
     @Published private(set) var requestingPermission = false
 
+    @Published var macOutput = UserDefaults.standard.object(forKey: "audio.mac") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(macOutput, forKey: "audio.mac") }
+    }
+    @Published var esp32Output = UserDefaults.standard.object(forKey: "audio.esp32") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(esp32Output, forKey: "audio.esp32") }
+    }
+    @Published var selectedSpeaker = UserDefaults.standard.string(forKey: "audio.robot") ?? "" {
+        didSet { UserDefaults.standard.set(selectedSpeaker, forKey: "audio.robot") }
+    }
+    struct Speaker: Decodable, Identifiable {
+        struct Playback: Decodable { let playbackId: String; let status: String; let error: String? }
+        let robotId: String
+        let name: String
+        let deviceType: String
+        let capabilities: [String]
+        let audio: Playback?
+        var id: String { robotId }
+        var compatible: Bool {
+            deviceType == "esp32" && ["audio_output", "tts_playback", "audio_stop"].allSatisfy(capabilities.contains)
+        }
+    }
+    @Published private(set) var speakers: [Speaker] = []
+    @Published private(set) var lastSpeakerDetails: Speaker?
+    @Published private(set) var audioError: String?
+    @Published private(set) var macPlaybackState = "idle"
+    private var macStoppedTurn: UUID?
+    private var remotePlayback: (api: URL, robotId: String, playbackId: String)?
+    var selectedSpeakerDetails: Speaker? { speakers.first { $0.robotId == selectedSpeaker } }
+    var speakerDiagnostics: Speaker? {
+        selectedSpeakerDetails ?? (lastSpeakerDetails?.robotId == selectedSpeaker ? lastSpeakerDetails : nil)
+    }
+
+    func refreshSpeakers(robot: RobotConnectionService) async {
+        guard let api = try? RobotSettingsAPI.apiBase(robot.serverURL).get() else { return }
+        do {
+            let devices: [Speaker]
+            if let fetchSpeakers { devices = try await fetchSpeakers() }
+            else { devices = try await robot.fetch(URLRequest(url: api.appendingPathComponent("robots"), timeoutInterval: 5)) }
+            speakers = devices.filter(\.compatible)
+            if selectedSpeaker.isEmpty, let first = speakers.first { selectedSpeaker = first.robotId }
+            if let speaker = selectedSpeakerDetails { lastSpeakerDetails = speaker }
+        } catch {
+            if !Task.isCancelled { speakers = [] }
+        }
+    }
+
+    func stopMacPlayback() {
+        macStoppedTurn = turn
+        clearPlayback()
+        if phase == .speaking { phase = .idle }
+    }
+
+    func stopEsp32Playback(robot: RobotConnectionService) {
+        var targets = remotePlayback.map { [$0] } ?? []
+        if let audio = selectedSpeakerDetails?.audio, ["buffering", "playing"].contains(audio.status),
+           let api = try? RobotSettingsAPI.apiBase(robot.serverURL).get(),
+           !targets.contains(where: { $0.robotId == selectedSpeaker && $0.playbackId == audio.playbackId }) {
+            targets.append((api, selectedSpeaker, audio.playbackId))
+        }
+        remotePlayback = nil
+        for target in targets {
+            Task {
+                do {
+                    let request = try jsonRequest(target.api.appendingPathComponent("audio/\(target.robotId)/stop"),
+                        ["playbackId": target.playbackId], timeout: 8)
+                    _ = try await robot.fetchData(request)
+                } catch { audioError = error.localizedDescription }
+            }
+        }
+    }
+
+    func stopPlayback(robot: RobotConnectionService) {
+        stopEsp32Playback(robot: robot)
+        cancel()
+    }
+
+    func submitText(_ text: String, robot: RobotConnectionService) {
+        let prompt = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !busy, !prompt.isEmpty, prompt.count <= 2000, let api = robot.voiceAPI else { return }
+        turn = UUID()
+        let current = turn
+        conversationalExpression = nil
+        errorMessage = nil
+        transcription = prompt
+        reply = ""
+        phase = .thinking
+        work = Task {
+            defer { if turn == current { work = nil } }
+            do {
+                if chatServer != api { chatServer = api; sessionID = nil }
+                let request = try jsonRequest(api.deletingLastPathComponent().appendingPathComponent("ai/chat"),
+                    ChatRequest(message: prompt, sessionId: sessionID), timeout: 150)
+                let start = clock.now
+                let answer: ChatReply = try await robot.fetch(request)
+                llmMs = milliseconds(since: start)
+                sessionID = answer.sessionId
+                reply = answer.response
+                conversationalExpression = Self.responseExpression(answer.expression)
+                try await speak(api: api, robot: robot, current: current)
+            } catch { if turn == current, !Task.isCancelled { fail(error.localizedDescription) } }
+        }
+    }
+
     let vision: VisionInteraction
     private let fetchSpeech: ((URLRequest) async throws -> Data)?
+    private let fetchSpeakers: (() async throws -> [Speaker])?
 
     init(vision: VisionInteraction = VisionInteraction(),
-         fetchSpeech: ((URLRequest) async throws -> Data)? = nil) {
+         fetchSpeech: ((URLRequest) async throws -> Data)? = nil,
+         fetchSpeakers: (() async throws -> [Speaker])? = nil) {
         self.vision = vision
         self.fetchSpeech = fetchSpeech
+        self.fetchSpeakers = fetchSpeakers
         super.init()
     }
 
@@ -249,6 +355,7 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
 
     func stop(robot: RobotConnectionService) {
         robot.submit(.stop)
+        stopEsp32Playback(robot: robot)
         vision.autoScan = false
         cancel()
         if robot.connectionState != .connected { fail("Simulátor je odpojený.") }
@@ -373,14 +480,32 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
         let synthesis = clock.now
         do {
             let spoken = String(reply.prefix(500))
-            let request = try jsonRequest(api.appendingPathComponent("synthesize"), ["text": spoken], timeout: 75)
+            let destination = esp32Output ? selectedSpeakerDetails?.robotId : nil
+            let playbackID = UUID().uuidString
+            let playOnMac = macOutput
+            let previousRemote = remotePlayback
+            if let destination {
+                remotePlayback = (api.deletingLastPathComponent(), destination, playbackID)
+            }
+            audioError = nil
+            let request = try jsonRequest(api.appendingPathComponent("synthesize"),
+                SynthesisRequest(text: spoken, esp32RobotId: destination, playbackId: playbackID), timeout: 75)
             let audio: Data
             if let fetchSpeech { audio = try await fetchSpeech(request) }
-            else { audio = try await robot.fetchData(request) }
+            else {
+                audio = try await robot.fetchData(request) { response in
+                    self.audioError = response.value(forHTTPHeaderField: "X-Audio-Error")
+                    if self.audioError != nil { self.remotePlayback = previousRemote }
+                }
+            }
             try Task.checkCancellation()
             guard turn == current else { throw CancellationError() }
             ttsMs = milliseconds(since: synthesis)
-            try await playReply(audio)
+            if playOnMac && macOutput && macStoppedTurn != current {
+                do { try await playReply(audio) }
+                catch { macPlaybackState = "error"; throw error }
+            }
+            else { phase = .idle }
         } catch {
             if turn == current, !Task.isCancelled { ttsMs = milliseconds(since: synthesis) }
             throw error
@@ -404,6 +529,7 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
         envelope = analyzed
         player = playback
         phase = .speaking
+        macPlaybackState = "playing"
 
         // A stopped output can leave isPlaying false without a finish callback.
         let identifier = ObjectIdentifier(playback)
@@ -435,6 +561,7 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
     }
 
     private func clearPlayback() {
+        macPlaybackState = "idle"
         playbackWatch?.cancel()
         playbackWatch = nil
         player?.stop()
@@ -456,8 +583,10 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
         guard let player, ObjectIdentifier(player) == identifier else { return }
         clearPlayback()
         if success {
+            macPlaybackState = "completed"
             phase = errorMessage == nil ? .idle : .error
         } else {
+            macPlaybackState = "error"
             fail("Přehrávání hlasové odpovědi selhalo.")
         }
     }
@@ -504,6 +633,12 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
         let sessionId: UUID?
         let response: String?
         let expression: String?
+    }
+
+    private struct SynthesisRequest: Encodable {
+        let text: String
+        let esp32RobotId: String?
+        let playbackId: String
     }
 
     private struct ChatRequest: Encodable {

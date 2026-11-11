@@ -22,6 +22,8 @@ builder.Services.AddSingleton<ILoggerProvider>(services => services.GetRequiredS
 builder.Services.AddControllers();
 builder.Services.AddSingleton<RobotWebSocket>();
 builder.Services.AddSingleton<RobotRegistry>();
+builder.Services.AddSingleton<AudioPlaybackService>();
+builder.Services.AddHostedService(services => services.GetRequiredService<AudioPlaybackService>());
 builder.Services.AddTransient<IRobotCommandInterpreter, RobotCommandInterpreter>();
 builder.Services.AddSingleton<RobotPlanExecutor>();
 builder.Services.AddHostedService(services => services.GetRequiredService<RobotPlanExecutor>());

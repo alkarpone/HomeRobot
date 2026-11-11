@@ -66,3 +66,11 @@ open "$base/camera/stream"
 | `/camera/stream` | Multipart MJPEG for one viewer at a time. The stream runs independently of the status and snapshot handlers. |
 
 This development HTTP server exposes the camera to peers on the trusted network without HTTP authentication or TLS.
+
+## Server-driven Piper speech
+
+P13-A extends this project with an optional authenticated WSS robot client and
+bounded HTTPS PCM streaming through the existing SpeakerManager. Wi-Fi, GPIOs,
+I2S initialization, test tone, camera, microphone and OLED retain their existing
+implementations. Without provisioned server settings, existing HTTP operation
+continues. See [server settings, application flash and physical verification](../../docs/ESP32_TTS.md).

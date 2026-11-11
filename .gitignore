@@ -7,3 +7,6 @@ TestResults/
 .venv/
 __pycache__/
 /src/HomeRobot.Server/models/
+
+# Private LAN deployment configuration and hardware rollback images.
+/.local/

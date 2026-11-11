@@ -132,6 +132,9 @@ public sealed class DashboardTests : IDisposable
         using var challenge = await client.GetAsync("/");
         Assert.Equal(HttpStatusCode.Unauthorized, challenge.StatusCode);
         Assert.Equal("Basic", challenge.Headers.WwwAuthenticate.Single().Scheme);
+        using var audio = new HttpRequestMessage(HttpMethod.Get, "/api/audio/resources/unknown");
+        audio.Headers.Add("X-Audio-Token", new string('A', 64));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(audio)).StatusCode);
         Authenticate(client, "wrong-password");
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.DeleteAsync("/api/memory")).StatusCode);
         Authenticate(client, Password);

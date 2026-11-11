@@ -128,6 +128,82 @@ final class VisionTests: XCTestCase {
     }
 
     @MainActor
+    func testAudioOutputCombinationsShareOneSynthesisAndKeepMacIndependent() async throws {
+        let keys = ["audio.mac", "audio.esp32", "audio.robot"]
+        let saved = keys.map { UserDefaults.standard.object(forKey: $0) }
+        defer {
+            for (key, value) in zip(keys, saved) { UserDefaults.standard.set(value, forKey: key) }
+        }
+        let robot = RobotConnectionService()
+        let previous = robot.serverURL
+        defer { robot.serverURL = previous }
+        robot.serverURL = "ws://localhost:5080/ws/robot"
+        let speaker = VoiceInteraction.Speaker(robotId: "speaker", name: "ESP32", deviceType: "esp32",
+            capabilities: ["audio_output", "tts_playback", "audio_stop"], audio: nil)
+        for (mac, esp) in [(true, false), (false, true), (true, true), (false, false)] {
+            let vision = VisionInteraction(camera: StubCamera(photo: try png())) { request in
+                let data = Data("{\"response\":\"Ahoj.\",\"cached\":false,\"expression\":\"happy\",\"sessionId\":\"\(UUID())\",\"inferenceMs\":10,\"processingMs\":12}".utf8)
+                return (data, HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200,
+                    httpVersion: nil, headerFields: nil)!)
+            }
+            try await capture(vision)
+            var calls = 0
+            var pauseSynthesis = false
+            var speakerConnected = true
+            let voice = VoiceInteraction(vision: vision, fetchSpeech: { request in
+                calls += 1
+                if pauseSynthesis { try await Task.sleep(for: .milliseconds(100)) }
+                let body = try JSONDecoder().decode([String: String].self, from: XCTUnwrap(request.httpBody))
+                XCTAssertEqual(body["esp32RobotId"], esp ? "speaker" : nil)
+                XCTAssertNotNil(body["playbackId"])
+                return mac ? self.wav() : Data([0]) // ESP32-only must never decode Mac audio.
+            }, fetchSpeakers: { speakerConnected ? [speaker] : [] })
+            voice.macOutput = mac
+            voice.esp32Output = esp
+            voice.selectedSpeaker = "speaker"
+            await voice.refreshSpeakers(robot: robot)
+            XCTAssertTrue(voice.selectedSpeakerDetails?.compatible == true)
+            voice.analyzeImage("Co vidíš?", robot: robot, followUp: false)
+            try await wait { !voice.busy }
+            voice.speakVisionAnswer(robot: robot)
+            try await wait { voice.phase == .speaking || !voice.busy }
+            XCTAssertEqual(calls, 1)
+            XCTAssertNil(voice.errorMessage)
+            XCTAssertEqual(voice.phase, mac ? .speaking : .idle)
+            XCTAssertEqual(voice.macPlaybackState, mac ? "playing" : "idle")
+            voice.stopMacPlayback()
+            XCTAssertEqual(voice.mouthOpenness, 0)
+            XCTAssertEqual(voice.macPlaybackState, "idle")
+            if mac && esp {
+                pauseSynthesis = true
+                voice.speakVisionAnswer(robot: robot)
+                try await wait { calls == 2 }
+                voice.stopMacPlayback()
+                try await wait { !voice.busy }
+                XCTAssertEqual(voice.phase, .idle)
+                XCTAssertEqual(voice.macPlaybackState, "idle")
+                XCTAssertNil(voice.errorMessage)
+                speakerConnected = false
+                await voice.refreshSpeakers(robot: robot)
+                XCTAssertNil(voice.selectedSpeakerDetails)
+                XCTAssertEqual(voice.speakerDiagnostics?.robotId, "speaker")
+            }
+        }
+    }
+
+    func testSpeakerRequiresAllCapabilitiesAndPhysicalDeviceType() {
+        for (type, capabilities, expected) in [
+            ("esp32", ["audio_output", "tts_playback", "audio_stop"], true),
+            ("esp32", ["audio_output"], false),
+            ("simulator", ["audio_output", "tts_playback", "audio_stop"], false)
+        ] {
+            let speaker = VoiceInteraction.Speaker(robotId: "robot", name: "Robot", deviceType: type,
+                capabilities: capabilities, audio: nil)
+            XCTAssertEqual(speaker.compatible, expected)
+        }
+    }
+
+    @MainActor
     func testInvalidImageDoesNotReachServer() async throws {
         let vision = VisionInteraction(camera: StubCamera()) { _ in
             XCTFail("Invalid image reached the transport")

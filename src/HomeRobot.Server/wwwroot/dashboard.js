@@ -492,10 +492,16 @@ function robots(signal) {
             feedback(status, command.status === "completed" ? "Emergency stop confirmed by robot."
                 : "Stop was not confirmed (" + command.status + ").", command.status !== "completed");
         }), "danger");
+        const testSpeaker = button("Test Speaker", () => perform(testSpeaker, status, signal, async () => {
+            const result = await api("audio/" + encodeURIComponent(robot.robotId) + "/test", signal, { method: "POST" });
+            feedback(status, "Speech submitted: " + result.playbackId + ". Watch playback status for completion.");
+        }));
+        testSpeaker.hidden = robot.deviceType !== "esp32" ||
+            !["audio_output", "tts_playback", "audio_stop"].every(value => robot.capabilities.includes(value));
         const availability = badge("Connected", "good");
         const title = el("div", "section-title", el("h2", "", robot.name), availability);
-        const node = el("section", "panel stack", title, details, el("div", "controls", stop), status);
-        return { node, details, stop, availability, connected: true };
+        const node = el("section", "panel stack", title, details, el("div", "controls", stop, testSpeaker), status);
+        return { node, details, stop, testSpeaker, availability, connected: true };
     }
     async function loadHistory() {
         const generation = ++historyRequest;
@@ -528,6 +534,7 @@ function robots(signal) {
                 card.availability.textContent = "Disconnected";
                 card.availability.dataset.tone = "bad";
                 card.stop.hidden = true;
+                card.testSpeaker.disabled = true;
             }
         }
         for (const robot of devices) {
@@ -537,9 +544,13 @@ function robots(signal) {
             card.availability.textContent = "Connected";
             card.availability.dataset.tone = "good";
             card.stop.hidden = false;
+            card.testSpeaker.disabled = false;
             metrics(card.details, [
                 ["ROBOT ID", robot.robotId], ["CLIENT TYPE", robot.deviceType],
                 ["LAST HEARTBEAT", time(robot.lastHeartbeat)], ["LAST TELEMETRY", time(robot.lastTelemetry)],
+                ["AUDIO CAPABILITY", robot.capabilities.includes("tts_playback") ? "TTS playback" : "Unavailable"],
+                ["PLAYBACK STATE / RESULT", robot.audio?.status ?? "idle"],
+                ["PLAYBACK ID", robot.audio?.playbackId], ["LAST AUDIO ERROR", robot.audio?.error],
                 ["CURRENT STATE", robot.telemetry?.state], ["LAST EXECUTED COMMAND", robot.lastExecutedCommand?.command],
                 ["POSITION (X, Y)", robot.telemetry ? robot.telemetry.position.x.toFixed(1) + ", " +
                     robot.telemetry.position.y.toFixed(1) + " cm" : null],

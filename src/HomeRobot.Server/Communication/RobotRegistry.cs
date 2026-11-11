@@ -13,6 +13,7 @@ internal sealed class RobotSession(long connectedAt)
     public DateTimeOffset? LastTelemetry { get; set; }
     public RobotCommandStatus? LastExecutedCommand { get; set; }
     public bool Closed { get; set; }
+    public AudioPlaybackStatus? Audio { get; set; }
     public RobotPlanLease? Plan { get; set; }
     public Guid VoiceTurn { get; set; } = Guid.NewGuid();
     public (Guid Id, string Text, long IssuedAt)? VoiceInstruction { get; set; }
@@ -225,6 +226,28 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
             if (!robots.TryGetValue(robotId, out var session) || !CheckDeadlines(session))
                 return (404, null, "robot_not_connected");
 
+            if (command.Command.StartsWith("audio_", StringComparison.Ordinal) &&
+                (session.Registration?.DeviceType != "esp32" ||
+                 !new[] { "audio_output", "tts_playback", "audio_stop" }.All(session.Registration.Capabilities.Contains)))
+                return (400, null, "audio_unsupported");
+            if (command.Command == "audio_play" && session.Commands.Values.Any(item => item.Command.Command == "audio_play"))
+                return (409, null, "audio_busy");
+            if (command.Parameters is AudioStopParameters target)
+            {
+                var playback = session.Commands.Values.FirstOrDefault(item =>
+                    item.Command.Parameters is AudioPlayParameters audio && audio.PlaybackId == target.PlaybackId);
+                if (playback is null) return (409, null, "playback_not_active");
+                var pendingStop = session.Commands.Values.FirstOrDefault(item =>
+                    item.Command.Parameters is AudioStopParameters audio && audio.PlaybackId == target.PlaybackId);
+                if (pendingStop is not null) return (202, pendingStop.Status, null);
+                if (!playback.Dispatched)
+                {
+                    // Never send a priority stop ahead of a play command that has not left the queue.
+                    Finish(session, playback, "cancelled", "audio_stopped");
+                    return (202, playback.Status, null);
+                }
+            }
+
             var stop = session.Commands.Values.FirstOrDefault(item => item.Command.IsStop);
             if (command.IsStop && lease is null)
             {
@@ -251,13 +274,14 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
             var status = new RobotCommandStatus(RobotProtocol.NewId(), command.Command, "pending", now, now, null);
             var tracked = new TrackedCommand(command, status, clock.GetTimestamp());
             session.Commands.Add(status.CommandId, tracked);
+            UpdateAudio(session, tracked);
             if (lease is not null)
             {
                 lease.ActiveCommand = tracked;
                 lease.Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             }
             var message = new OutboundMessage(new RobotMessage<RobotCommand>(status.CommandId, "command", now, command), tracked);
-            if (command.IsStop)
+            if (command.IsStop || command.Command == "audio_stop")
             {
                 // Registration must reach the device before its first command.
                 if (session.Outbound.First is { Value.RegistrationAck: true } registration)
@@ -311,6 +335,7 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
                 if (!valid)
                     return "invalid_command_transition";
                 command.Status = command.Status with { Status = state, UpdatedAt = clock.GetUtcNow() };
+                UpdateAudio(session, command);
             }
 
             return null;
@@ -374,7 +399,7 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
 
         foreach (var command in session.Commands.Values.ToArray())
         {
-            if (clock.GetElapsedTime(command.StartedAt, now).TotalSeconds < options.CommandTimeoutSeconds)
+            if (clock.GetElapsedTime(command.StartedAt, now).TotalSeconds < (command.Command.Command.StartsWith("audio_", StringComparison.Ordinal) ? 45 : options.CommandTimeoutSeconds))
                 continue;
 
             Finish(session, command, "failed", "command_timeout");
@@ -422,6 +447,8 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
         session.Commands.Remove(id);
         var key = (session.Registration!.RobotId, id);
         var status = command.Status with { Status = state, UpdatedAt = clock.GetUtcNow(), Message = message };
+        command.Status = status;
+        UpdateAudio(session, command);
         history.Add(key, status);
         if (state == "completed")
             session.LastExecutedCommand = status;
@@ -439,6 +466,20 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
     {
         session.LastActivity = clock.GetTimestamp();
         session.LastSeen = clock.GetUtcNow();
+    }
+
+    private static void UpdateAudio(RobotSession session, TrackedCommand command)
+    {
+        if (command.Command.Parameters is not AudioPlayParameters audio) return;
+        var state = command.Status.Status switch
+        {
+            "pending" or "accepted" => "buffering",
+            "executing" => "playing",
+            "failed" => "error",
+            "cancelled" => "idle",
+            _ => command.Status.Status
+        };
+        session.Audio = new(audio.PlaybackId, state, state == "error" ? command.Status.Message : null);
     }
 
     private static bool Enqueue(RobotSession session, OutboundMessage message)
@@ -459,7 +500,8 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
         {
             LastHeartbeat = session.LastHeartbeat,
             LastTelemetry = session.LastTelemetry,
-            LastExecutedCommand = session.LastExecutedCommand
+            LastExecutedCommand = session.LastExecutedCommand,
+            Audio = session.Audio
         };
     }
 }

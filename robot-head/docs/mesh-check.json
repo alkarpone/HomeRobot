@@ -1,0 +1,79 @@
+[
+  {
+    "file": "front_bezel.stl",
+    "triangles": 1400,
+    "bounds_mm": [
+      110.0,
+      100.0,
+      4.0
+    ],
+    "closed_connected_manifold": true,
+    "consistent_winding": true
+  },
+  {
+    "file": "main_enclosure.stl",
+    "triangles": 23584,
+    "bounds_mm": [
+      110.0,
+      100.0,
+      81.2
+    ],
+    "closed_connected_manifold": true,
+    "consistent_winding": true
+  },
+  {
+    "file": "front_faceplate.stl",
+    "triangles": 6196,
+    "bounds_mm": [
+      110.0,
+      100.0,
+      23.0
+    ],
+    "closed_connected_manifold": true,
+    "consistent_winding": true
+  },
+  {
+    "file": "rear_cover.stl",
+    "triangles": 3016,
+    "bounds_mm": [
+      110.0,
+      100.0,
+      20.42
+    ],
+    "closed_connected_manifold": true,
+    "consistent_winding": true
+  },
+  {
+    "file": "esp32_mount.stl",
+    "triangles": 2144,
+    "bounds_mm": [
+      73.0,
+      40.0,
+      3.0
+    ],
+    "closed_connected_manifold": true,
+    "consistent_winding": true
+  },
+  {
+    "file": "oled_mount.stl",
+    "triangles": 2144,
+    "bounds_mm": [
+      51.4,
+      45.5,
+      3.0
+    ],
+    "closed_connected_manifold": true,
+    "consistent_winding": true
+  },
+  {
+    "file": "speaker_mount.stl",
+    "triangles": 1552,
+    "bounds_mm": [
+      52.0,
+      52.0,
+      3.0
+    ],
+    "closed_connected_manifold": true,
+    "consistent_winding": true
+  }
+]

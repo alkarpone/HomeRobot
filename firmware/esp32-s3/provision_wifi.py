@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from urllib.parse import urlsplit
 
 
 def read_credentials(path):
@@ -23,12 +24,29 @@ def read_credentials(path):
     return config[b"WIFI_SSID"], config[b"WIFI_PASSWORD"]
 
 
+def read_server_settings(path):
+    config = json.loads(path.read_text(encoding="utf-8-sig"))
+    url, robot_id, password = config["url"], config["robotId"], config["password"]
+    parsed = urlsplit(url)
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.path or parsed.query or parsed.fragment
+            or parsed.username or parsed.password or len(url) > 240):
+        raise ValueError("use an HTTPS origin without path or credentials")
+    if (not 1 <= len(robot_id) <= 64 or not all(c.isascii() and (c.isalnum() or c in "_.-") for c in robot_id)
+            or not 24 <= len(password) <= 128 or not password.isascii() or any(ord(c) < 33 for c in password)):
+        raise ValueError("invalid robot ID or password")
+    ca = (path.parent / config["caFile"]).read_text()
+    if "-----BEGIN CERTIFICATE-----" not in ca or len(ca.encode()) > 3999:
+        raise ValueError("use a PEM CA certificate of at most 3999 bytes")
+    return {"server_url": url, "robot_id": robot_id, "server_password": password, "server_ca": ca}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True, help="ESP32-S3 serial port")
     project = Path(__file__).resolve().parent
     parser.add_argument("--config", type=Path, default=project / ".env",
                         help="local .env or JSON credential file (default: project .env)")
+    parser.add_argument("--server-config", type=Path, help="optional private HTTPS server JSON settings")
     args = parser.parse_args()
 
     idf = os.environ.get("IDF_PATH")
@@ -36,8 +54,9 @@ def main():
         parser.error("activate ESP-IDF using export.sh first")
     try:
         ssid, password = read_credentials(args.config)
+        server = read_server_settings(args.server_config) if args.server_config else {}
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
-        parser.error("use WIFI_SSID and WIFI_PASSWORD in .env or ssid and password in JSON")
+        parser.error("invalid Wi-Fi or optional server settings; see the firmware README")
     if not 1 <= len(ssid) <= 32 or not 8 <= len(password) <= 63 or b"\0" in ssid + password:
         parser.error("use an SSID of 1–32 bytes and a WPA2/WPA3 passphrase of 8–63 bytes")
 
@@ -63,6 +82,8 @@ def main():
             writer.writerow(["homerobot", "namespace", "", ""])
             writer.writerow(["ssid", "data", "hex2bin", ssid.hex()])
             writer.writerow(["password", "data", "hex2bin", password.hex()])
+            for key, value in server.items():
+                writer.writerow([key, "data", "string", value])
         subprocess.run(
             [sys.executable, str(generator), "generate", str(source), str(image), str(size)],
             check=True,

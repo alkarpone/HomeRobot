@@ -475,11 +475,13 @@ final class RobotConnectionService: ObservableObject {
         return try JSONDecoder().decode(Value.self, from: data)
     }
 
-    func fetchData(_ request: URLRequest, acceptingRejection: Bool = false) async throws -> Data {
+    func fetchData(_ request: URLRequest, acceptingRejection: Bool = false,
+                   inspectResponse: ((HTTPURLResponse) -> Void)? = nil) async throws -> Data {
         try Task.checkCancellation()
         let (data, response) = try await session.data(for: request)
         try Task.checkCancellation()
         lastCommunication = Date()
+        if let response = response as? HTTPURLResponse { inspectResponse?(response) }
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(code) || (acceptingRejection && code == 422) else {
             let detail = try? JSONDecoder().decode(RESTProblem.self, from: data)

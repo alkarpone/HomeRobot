@@ -4,6 +4,7 @@
 #include "oled.h"
 #include "speaker_manager.h"
 #include "wifi.h"
+#include "robot_audio.h"
 
 void app_main(void)
 {
@@ -30,4 +31,5 @@ void app_main(void)
         return;
     }
     ESP_ERROR_CHECK(camera_http_start());
+    robot_audio_start();
 }

@@ -29,7 +29,7 @@ public sealed class Esp32SpeakerClient(HttpClient http)
             throw new HttpRequestException("The ESP32 did not accept the audio clip.", null, response.StatusCode);
     }
 
-    private static byte[] ToPcm(ReadOnlySpan<byte> wav)
+    internal static byte[] ToPcm(ReadOnlySpan<byte> wav)
     {
         if (!WavAudio.TryReadPcm(wav, out var samples, out var rate, out var channels))
             throw new ArgumentException("Expected a PCM16 WAV of at most 30 seconds.", nameof(wav));

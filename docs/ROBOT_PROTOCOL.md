@@ -69,3 +69,61 @@ Configure `RobotProtocol` in `appsettings.json` or via environment variables suc
 ESP32 firmware must independently implement a motor watchdog, emergency stop, communication timeout, motor speed limits, and obstacle detection when sensors are available. A WebSocket disconnect alone cannot provide physical safety. Use this unauthenticated endpoint on a trusted development network.
 
 P5 should use a stable robot ID, `simulator` registration, the advertised heartbeat schedule, and the same envelope and validation rules as ESP32. Keep the receive loop active during simulated motion so stop can preempt it. Send telemetry at startup and as simulated state changes. On loss of communication, halt simulated motion locally, reconnect and register again, and discard prior in-flight work.
+
+## P13-A audio commands
+
+Audio-capable ESP32 devices register separately from simulators with `audio_output`,
+`tts_playback`, and `audio_stop`. No motor or microphone capability is implied.
+The existing LAN HTTPS/Basic boundary also authenticates WSS and audio downloads.
+
+The server prepares playback through `POST /api/voice/synthesize` with optional
+`esp32RobotId` and `playbackId` identifiers. The response remains the original WAV.
+`X-Playback-Id` identifies accepted remote delivery; `X-Audio-Error` reports an
+independent routing/format/busy error without losing the Mac WAV. The client uses
+one synthesis call per reply. Omitting the device preserves the existing endpoint.
+
+A device receives the usual `command` envelope; its envelope ID remains the P4 command ID:
+
+```json
+{"id":"cmd-audio-1","type":"command","timestamp":"2026-11-11T10:00:00Z","payload":{"command":"audio_play","parameters":{"playbackId":"playback-1","resource":"/api/audio/resources/playback-1","token":"64_UPPERCASE_HEX_CHARACTERS","sampleRate":16000,"channels":1,"bitsPerSample":16,"byteLength":32000,"encoding":"pcm_s16le"}}}
+```
+
+`resource` is strictly relative to the provisioned server origin. Download it with
+Basic authorization and `X-Audio-Token: <token>`; redirects are forbidden. The body
+is raw PCM, not WAV. Require exact `Content-Length`, complete samples, PCM16LE mono
+16 kHz and at most 960,000 bytes. Reject unsupported metadata before playback.
+Tokens are scoped to one resource and expire after 45 seconds; terminal results,
+disconnection and restart also invalidate resources. Audio bytes never travel in WSS.
+Do not log tokens or put them into URL query strings.
+
+Acknowledge `accepted` after validating/reserving the job (`buffering`), then
+`executing` only when PCM playback actually starts (`playing`). Send `command_result`
+with `completed` only after I2S finishes. Network interruption, incomplete downloads,
+format mismatch or output failure produce `failed`; cancellation produces `cancelled`
+after I2S stops. Existing P4 ordering and duplicate-result rejection apply. Audio's
+45-second deadline does not change movement deadlines. Overlapping clips are rejected.
+
+Targeted stop uses a new command ID and the original playback ID:
+
+```json
+{"id":"cmd-audio-stop","type":"command","timestamp":"2026-11-11T10:00:01Z","payload":{"command":"audio_stop","parameters":{"playbackId":"playback-1"}}}
+```
+
+Acknowledge the stop, cancel the matching play command, then complete the stop once
+output has stopped. An unrelated/stale playback ID cannot stop another clip. The
+firmware cancels playback locally on connection loss and never resumes old speech.
+
+`GET /api/robots` and individual robot details add nullable `audio` with `playbackId`,
+`status` (`buffering`, `playing`, `completed`, `idle`, `error`) and nullable `error`.
+A null value means no audio request has been tracked on this connection. P4 command
+history retains the last result across disconnects as before.
+
+| Additional REST request | Behavior |
+| --- | --- |
+| `GET /api/audio/resources/{playbackId}` | Authenticated scoped PCM download; missing, invalid, expired or released token returns 404. |
+| `POST /api/audio/{robotId}/stop` with `{"playbackId":"..."}` | 202 for a stop or pending synthesis cancellation; 404 disconnected, 400 unsupported, 429 bounded capacity. Cancelling a not-yet-dispatched ID is remembered for 90 seconds. |
+| `POST /api/audio/{robotId}/test` | One Czech Piper synthesis and remote dispatch; 202 queued, 409 delivery rejected. |
+
+Playback URLs and metadata cannot be supplied through the general REST command endpoint;
+only the server prepares `audio_play`. `audio_stop` is also accepted through existing
+P4 command submission. Detailed [configuration and physical tests](ESP32_TTS.md).

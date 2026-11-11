@@ -1,5 +1,49 @@
 # Project status
 
+## Repository checkpoint — audio integration and head enclosure — 2026-11-11
+
+- **Scope** — ESP32 audio integration, simulator audio controls, macOS launcher, documentation and printable head enclosure assets.
+- **Verification** — All 184 .NET tests passed. Dashboard JavaScript syntax, launcher shell syntax and tracked diff whitespace checks passed. macOS and firmware builds were not rerun for this checkpoint.
+- **Repository** — Preserved the existing ESP-IDF submodule revision; its nested local checkout metadata is incomplete and was excluded from staging.
+
+## Piper delivery through the existing ESP32 HTTP API — 2026-11-11
+
+- **Current deployment** — Uses the existing `/audio/play` API directly; no firmware flash or Wi-Fi provisioning was performed. This supersedes the proposed WSS deployment for the current hardware. Private launcher settings enable `Speech:Esp32:Enabled`, configure `Speech:Esp32:BaseUrl` and set `Speech:Esp32:Volume=50`; the server keeps its original loopback listener.
+- **Minimal integration** — `VoiceController.Synthesize` passes the single Piper WAV to the existing `Esp32SpeakerClient`, then returns that original WAV to Mac. The existing conversion reads actual WAV metadata and sends fixed-length PCM16LE mono at 16 kHz with `application/octet-stream` and `X-Audio-Volume`. Device errors preserve the Mac WAV. `X-Esp32-Audio` reports `accepted` or `error`.
+- **Verification** — All 38 focused speaker/voice tests passed. A live simulator text turn made one AI call and one Piper synthesis; ESP32 returned HTTP 202 for `/audio/play` and the Mac player reached `completed`. A separate direct Piper speech POST also returned 202. These acknowledgements do not confirm audible physical output or playback completion.
+- **Existing API limits** — HTTP 202 means accepted, not completed. The existing API has no remote stop/status endpoint. Current HTTP output is controlled by server configuration; the earlier simulator WebSocket device indicator does not represent this HTTP speaker.
+
+## P13-A — ESP32 TTS integration and dual audio output — 2026-11-11
+
+- **Implemented** — Reused the existing conversation/Whisper/Piper pipeline, P4 registry and command transitions, ESP-IDF firmware, Wi-Fi and SpeakerManager I2S configuration. One synthesis returns the original Mac WAV and prepares authenticated, scoped 16 kHz PCM for ESP32. The installed Czech voice declares 22.05 kHz; conversion reads actual WAV metadata.
+- **Firmware** — Optional authenticated WSS registration/heartbeat/reconnect with audio-only capabilities, bounded HTTPS PCM streaming into the existing DMA write path, targeted stop, real start/completion/error reporting and repeat rejection. GPIO41/GPIO42/GPIO14, safe 20% stream volume, existing test tone, HTTP upload, camera, microphone and OLED implementations are preserved. HTTPS server/CA settings extend the existing private NVS provisioning.
+- **Simulator and dashboard** — Persisted independent Mac/ESP32 toggles, physical device selection, audio state/error diagnostics, independent/global audio stop and text conversation entry. Existing voice routes and Mac lip sync remain. P10 adds speaker status and a Czech Piper Test Speaker action. Cancellation covers synthesis, queued dispatch and active playback.
+- **Verification** — .NET server/test build succeeded and all 103 focused backend/protocol/voice/dashboard tests passed. Xcode built both app architectures; 36 simulator tests passed and seven opt-in live/fixture tests were skipped (43 total). ESP-IDF 5.5.2 built the final firmware successfully (0x10e420-byte application; 65% application partition free). JavaScript syntax, six offline provisioning validation cases and diff whitespace checks passed. No live Ollama inference or physical audio test was performed.
+- **Pending deployment/hardware** — Firmware was not flashed or provisioned. Configure the real LAN HTTPS listener, trusted CA/SAN and current admin credentials, then follow [build/flash and physical verification](docs/ESP32_TTS.md). Audible Piper playback, simultaneous real outputs, Wi-Fi recovery and cancellation under camera load remain unverified. Existing single-admin authentication/plaintext development NVS, 30-second ESP32 clips and the simulator's existing 500-character spoken-reply limit remain.
+
+## Snap-fit rear service cover — 2026-11-11
+
+- **Implemented** — Default rear cover now has two integral top/bottom cantilever hooks, insertion ramps and short guide lips. Matching shell windows allow sequential press-to-release opening without rear screws. Front bezel and internal mounts retain screws. `rear_attachment="screws"` restores the prior retention option; export matching shell/cover. Instructions and adjustable latch dimensions are in `robot-head/docs/snap-cover.md`.
+- **Verification** — OpenSCAD 2021.01 CGAL-exported the new shell and cover successfully. All seven current STLs passed the independent closed edge/vertex manifold, single-shell, winding, print-bed and bounds checks. Both retention modes compiled to CSG; default hook/window and speaker-clearance arithmetic passed. Updated OpenSCAD assembly/exploded/rear-cover previews were generated and the cover detail inspected. Rear print height is now 20.42 mm; external envelope remains 110 × 100 × 90 mm.
+- **Physical test pending** — Retention force, real printer clearance, layer adhesion and fatigue are not validated. Test on an empty shell before fitting electronics; PLA is the initial fit material, PETG preferable for repeated flexing. The older studio render predates the latch revision.
+
+## macOS server launcher — 2026-11-11
+
+- **Implemented** — Added a double-clickable macOS launcher for HomeRobot.Server on localhost port 5080, using the existing Ollama and speech configuration.
+- **Verification** — The launcher passed a shell syntax check. Interactive Finder launch remains to be checked.
+
+## Head enclosure exterior revision — 2026-11-11
+
+- **Implemented** — Revised actual OpenSCAD geometry toward the supplied visual reference: softened 12 mm corner facets, separate white beveled front bezel around the recessed dark face/camera turret, shallow camera well and recessed circular speaker grille. Seven printable parts; assembled envelope 110 × 100 × 90 mm. Front/rear screw axes moved together to suit the faceted corners; front screws are now M3 × 12. Electronics mounting datums and real OLED window size remain unchanged.
+- **Verification** — OpenSCAD 2021.01 successfully CGAL-exported the four changed parts (bezel, shell and both covers). All seven current STLs passed closed edge/vertex manifoldness, one connected shell, winding, bed-placement and print-bounds checks. Updated assembly/exploded PNGs and a Blender studio visualization made from the actual STL meshes were inspected. Blender is presentation-only; OpenSCAD remains the CAD source. Slicer and physical fit checks remain pending.
+- **Compatibility** — Do not mix earlier shells/covers with this revision. The 1.3-inch OLED is intentionally not enlarged to match the illustrative reference. Camera/ribbon, USB and speaker measurements still require physical verification.
+
+## Stationary head enclosure prototype — 2026-11-11
+
+- **Implemented** — Separate `robot-head/` parametric OpenSCAD project with six printable parts, assembled/exploded selectors, camera/ESP carrier and native-offset camera guides, OLED frame, right speaker grille and retaining ring, left microphone seat, amplifier shelf, USB service window and removable covers. Default envelope is 110 × 100 × 86 mm. Assembly, measurement, printing and export instructions are included.
+- **Verification** — Independent default-envelope arithmetic checked front-frame separation, speaker depth, rear-wall and rail clearance, flange capture and all six print bounds. SCAD delimiter checks passed. OpenSCAD 2021.01 was subsequently found on the Desktop. Fixed floating-point roundoff in the flush-camera assertion, CGAL-exported all six STLs, and generated assembly/exploded PNG previews. All six exported meshes passed independent edge/vertex manifoldness, connectedness, winding, bed-placement and bounds checks (`robot-head/docs/mesh-check.json`). Slicer validation remains pending. No application tests were needed or run.
+- **Fit-test requirements** — Actual camera native offset/ribbon routing, USB socket direction and plug sweep, OLED holes/window, speaker basket/flange, microphone port and component edge clearances remain unmeasured. The design is an initial fit-test prototype, not certified mechanical compatibility. Measure and adjust before full printing; follow `robot-head/docs/dimensions.md`.
+
 ## Repository checkpoint — 2026-11-11
 
 - **Scope** — macOS simulator, validated robot commands, Czech voice routing, personality and memory, vision, web dashboard, and ESP32-S3 camera, OLED, speaker and microphone firmware.
