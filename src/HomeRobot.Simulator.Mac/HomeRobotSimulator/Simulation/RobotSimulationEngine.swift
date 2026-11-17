@@ -1,7 +1,7 @@
 import Foundation
 
 enum RobotExpression: String, CaseIterable {
-    case idle, listening, thinking, speaking, happy, sad, error, executing
+    case idle, listening, thinking, speaking, happy, sad, error, executing, angry, surprised, eyes_closed
 }
 
 enum SimulationError: LocalizedError {
@@ -35,7 +35,17 @@ struct RobotSimulationEngine {
     let configuration: Configuration
     private(set) var position = RobotPosition()
     private(set) var movement = RobotMovement()
-    private(set) var expression = RobotExpression.idle
+    private(set) var hasSynchronizedFace = false
+    private var savedExpression = RobotExpression.idle
+    private var blinkUntil = Date.distantPast
+    var expression: RobotExpression { Date() < blinkUntil ? .eyes_closed : savedExpression }
+
+    mutating func synchronizeFace(_ value: String, blink: Bool = false) {
+        guard let face = RobotExpression(rawValue: value), face != .executing else { return }
+        hasSynchronizedFace = true
+        savedExpression = face
+        blinkUntil = blink ? Date().addingTimeInterval(0.18) : .distantPast
+    }
     private(set) var motion: Motion?
     private(set) var leftWheelTravel = 0.0
     private(set) var rightWheelTravel = 0.0
@@ -61,7 +71,7 @@ struct RobotSimulationEngine {
             guard let expression = RobotExpression(rawValue: value), expression != .executing else {
                 throw SimulationError.unsupportedExpression
             }
-            self.expression = expression
+            self.savedExpression = expression
         default:
             guard let amount = isMove ? parameters.distanceCm : parameters.angleDegrees,
                   amount > 0, amount <= (isMove ? configuration.maxDistanceCm : configuration.maxRotationDegrees),

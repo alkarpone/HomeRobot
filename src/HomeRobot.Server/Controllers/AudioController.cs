@@ -7,6 +7,10 @@ namespace HomeRobot.Server.Controllers;
 [Route("api/audio")]
 public sealed class AudioController(AudioPlaybackService playback, ITextToSpeechService tts) : ControllerBase
 {
+    [HttpGet("http-speaker")]
+    public IActionResult HttpSpeaker([FromServices] IConfiguration settings) =>
+        Ok(new { enabled = settings.GetValue<bool>("Speech:Esp32:Enabled") });
+
     [HttpGet("resources/{id}")]
     public IActionResult Download(string id, [FromHeader(Name = "X-Audio-Token")] string? token) =>
         token is not null && playback.Read(id, token) is { } pcm

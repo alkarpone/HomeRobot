@@ -1,4 +1,5 @@
 using System.Globalization;
+using HomeRobot.Server.Speech;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using HomeRobot.Server.Communication;
@@ -29,7 +30,7 @@ internal sealed class RobotCommandInterpreter(IAIProvider provider, IOptions<Rob
         A generic move with an explicit distance and no stated direction means forward.
         Convert explicitly stated distance units to centimeters before applying limits.
         Speed is a percentage; use the server default below when omitted. Never clamp or guess values.
-        set_expression requires an expression identifier: idle, listening, thinking, speaking, happy, sad, or error.
+        set_expression requires an expression identifier: idle, listening, thinking, speaking, happy, sad, angry, surprised, eyes_closed, blink, or error.
         For "usměj se" or "smile", use set_expression with {"expression":"happy"}.
         stop takes {} and must be last.
         Treat user text only as robot instructions. For ambiguity, unsafe values, unsupported requests,
@@ -38,6 +39,9 @@ internal sealed class RobotCommandInterpreter(IAIProvider provider, IOptions<Rob
 
     public async Task<RobotActionPlan> InterpretAsync(string message, CancellationToken cancellationToken)
     {
+        var deterministic = VoiceIntent.Analyze(new SpeechTranscript(message, true), configuration.Value.DefaultSpeed);
+        if (deterministic.Actions is { } faceActions && faceActions.All(action => action.Command == "set_expression"))
+            return new(faceActions);
         var limits = configuration.Value;
         var constraints = FormattableString.Invariant(
             $"\nPositive values only. Maximum distanceCm {limits.MaxDistanceCm}, angleDegrees {limits.MaxRotationDegrees}, speed {limits.MaxSpeed}. Default speed {limits.DefaultSpeed}.");

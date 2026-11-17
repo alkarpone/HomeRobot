@@ -22,6 +22,11 @@ builder.Services.AddSingleton<ILoggerProvider>(services => services.GetRequiredS
 builder.Services.AddControllers();
 builder.Services.AddSingleton<RobotWebSocket>();
 builder.Services.AddSingleton<RobotRegistry>();
+builder.Logging.AddFilter("System.Net.Http.HttpClient.esp32-face", LogLevel.Warning);
+builder.Services.AddSingleton<Esp32FaceDelivery>();
+builder.Services.AddHostedService(services => services.GetRequiredService<Esp32FaceDelivery>());
+builder.Services.AddHttpClient("esp32-face", client => client.Timeout = TimeSpan.FromSeconds(2))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
 builder.Services.AddSingleton<AudioPlaybackService>();
 builder.Services.AddHostedService(services => services.GetRequiredService<AudioPlaybackService>());
 builder.Services.AddTransient<IRobotCommandInterpreter, RobotCommandInterpreter>();
@@ -116,6 +121,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseWebSockets();
 app.MapControllers();
+app.MapGet("/api/face/esp32", (Esp32FaceDelivery delivery) => new { delivery.RobotId, delivery.Status });
 app.MapGet("/ws/robot", (HttpContext context, RobotWebSocket robot) => robot.HandleAsync(context));
 app.Run();
 

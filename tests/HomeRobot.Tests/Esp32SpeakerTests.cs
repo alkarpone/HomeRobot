@@ -80,6 +80,33 @@ public sealed class Esp32SpeakerTests
         Assert.Equal(1, posts);
     }
 
+    [Fact]
+    public async Task DisabledOutputSkipsHttpDeliveryAndStillReturnsMacWav()
+    {
+        var tts = new CountingTts();
+        using var handler = new CheckRequest((_, _) => throw new InvalidOperationException("Unexpected speaker upload."));
+        using var deviceHttp = new HttpClient(handler);
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Speech:Esp32:Enabled"] = "true",
+                ["Speech:Esp32:BaseUrl"] = "http://robot.local"
+            })).ConfigureTestServices(services =>
+            {
+                services.AddSingleton<ITextToSpeechService>(tts);
+                services.AddSingleton(new Esp32SpeakerClient(deviceHttp));
+            }));
+        using var client = factory.CreateClient();
+        using var configuration = await client.GetAsync("/api/audio/http-speaker");
+        configuration.EnsureSuccessStatusCode();
+        Assert.True((await configuration.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>()).GetProperty("enabled").GetBoolean());
+        using var response = await client.PostAsJsonAsync("/api/voice/synthesize", new { text = "Ahoj.", esp32Output = false });
+        response.EnsureSuccessStatusCode();
+        Assert.Equal(tts.Wave, await response.Content.ReadAsByteArrayAsync());
+        Assert.False(response.Headers.Contains("X-Esp32-Audio"));
+        Assert.Equal(1, tts.Calls);
+    }
+
     private sealed class CountingTts : ITextToSpeechService
     {
         public int Calls;

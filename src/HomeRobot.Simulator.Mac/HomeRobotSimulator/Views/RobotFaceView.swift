@@ -3,17 +3,18 @@ import SwiftUI
 struct RobotFaceView: View {
     let expression: RobotExpression
     let mouthOpenness: () -> Double
+    var isSpeaking = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 8) {
             TimelineView(.animation(minimumInterval: 1.0 / 30,
-                                    paused: reduceMotion && expression != .speaking)) { timeline in
+                                    paused: reduceMotion && expression != .speaking && !isSpeaking)) { timeline in
                 let time = timeline.date.timeIntervalSinceReferenceDate
                 let cycle = time.truncatingRemainder(dividingBy: 17.9)
                 let blinkDistance = min(abs(cycle - 2.2), abs(cycle - 6.7), abs(cycle - 12.1), abs(cycle - 16.8))
                 let blink = reduceMotion ? 1 : 1 - 0.94 * pow(max(0, 1 - blinkDistance / 0.11), 1.5)
-                let openness = expression == .speaking ? mouthOpenness() : 0
+                let openness = (isSpeaking || expression == .speaking) ? mouthOpenness() : (expression == .surprised ? 0.4 : 0)
                 VStack(spacing: 12) {
                     HStack(spacing: 28) {
                         eye(side: -1, blink: blink, time: time)
@@ -61,6 +62,9 @@ struct RobotFaceView: View {
     private var pose: (width: Double, height: Double, tilt: Double, brow: Double, smile: Double) {
         switch expression {
         case .idle: (30, 34, 0, 0, 0)
+        case .angry: (32, 15, -28, 3, -0.8)
+        case .surprised: (35, 47, 0, -7, 0)
+        case .eyes_closed: (31, 3, 0, 0, 0)
         case .listening: (31, 44, 0, -4, 0.15)
         case .thinking: (29, 30, -10, -2, 0)
         case .speaking: (31, 36, 0, -1, 0)

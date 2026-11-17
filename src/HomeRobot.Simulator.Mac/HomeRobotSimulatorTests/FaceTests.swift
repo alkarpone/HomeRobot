@@ -3,6 +3,21 @@ import XCTest
 @testable import HomeRobotSimulator
 
 final class FaceTests: XCTestCase {
+    func testSynchronizedExpressionsAndTemporaryBlink() async throws {
+        var robot = RobotSimulationEngine()
+        for expression in ["idle", "happy", "sad", "angry", "surprised", "eyes_closed"] {
+            robot.synchronizeFace(expression)
+            XCTAssertEqual(robot.expression.rawValue, expression)
+        }
+        robot.synchronizeFace("angry", blink: true)
+        XCTAssertEqual(robot.expression, .eyes_closed)
+        try await Task.sleep(for: .milliseconds(220))
+        XCTAssertEqual(robot.expression, .angry)
+        robot.synchronizeFace("invalid")
+        XCTAssertEqual(robot.expression, .angry)
+        XCTAssertTrue(robot.hasSynchronizedFace)
+    }
+
     func testPCMEnvelopeUsesRMSAndInterpolates() throws {
         let config = SpeechEnvelope.Configuration(noiseGate: 0, wideOpenRMS: 1,
                                                    attackSeconds: 0, releaseSeconds: 0)

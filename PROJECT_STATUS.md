@@ -1,5 +1,52 @@
 # Project status
 
+## Repository checkpoint — face synchronization and OLED lip sync — 2026-11-17
+
+- **Scope** — Commit the accumulated server, simulator and firmware face synchronization, OLED audio lip sync, HTTP speaker routing fixes and documentation. Personal Xcode window state is excluded.
+- **Verification** — All 106 focused .NET face, protocol, voice intent and speaker tests passed. Git whitespace validation passed. Firmware and macOS builds were not repeated for this checkpoint; earlier verification is recorded below.
+
+## P13-C runtime speaker configuration — 2026-11-17
+
+- **Resolved** — The running server reported HTTP speaker disabled despite the existing private launcher configuration enabling it. Restarted HomeRobot.Server through the existing launcher; `/api/audio/http-speaker` now returns `enabled:true`. ESP32 HTTP health reports camera ready. No server or simulator source changes were needed; physical speech and OLED lip sync remain to be observed.
+
+## P13-C application deployment — 2026-11-17
+
+- **Deployed** — With explicit user authorization, `idf.py app-flash` wrote only the updated application at 0x10000 to the connected ESP32-S3. Flash hash verification succeeded and the board was reset. No provisioning, partition changes or firmware extraction was performed.
+- **Pending** — Visible OLED lip sync and audible Piper playback still require physical observation.
+
+## P13-C — OLED audio lip sync — 2026-11-17
+
+- **Implemented** — SpeakerManager averages absolute volume-scaled PCM16 samples over 40 ms and maps them to four mouth openings (thresholds 120/600/1800), with fast attack and one-step release. Silence closes immediately at the next window. Atomic state is read by the existing OLED task; no display transfers, waits or allocations were added to playback. Both HTTP uploads and WSS streams reuse the same I2S path.
+- **Face and lifecycle** — Mouth opening is independent of expression and blink. Silent surprised faces now use a closed mouth while retaining surprised eyes. Completion and all playback error exits reset the mouth; cancellation is visible on the next OLED poll (20 ms), and a 120 ms freshness limit closes it during a stalled stream. Existing HTTP playback still has no remote stop endpoint. Server and macOS simulator were not changed.
+- **Verification** — ESP-IDF 5.5.2 firmware build succeeded. Focused host checks using the actual envelope, pixel renderer, state getter and reset guard passed for silence, amplitude levels, release smoothing, signed PCM range, increasing mouth size, preserved eyes/brows across all expressions, cancellation, stale audio and cleanup. Hardware timing, visible OLED motion and audible playback remain unverified. No flash, provisioning or device access was performed.
+
+## P13-B deployment and physical HTTP verification — 2026-11-11
+
+- **Deployed** — After explicit user confirmation, `idf.py app-flash` wrote and verified only the application on the connected ESP32-S3. Existing NVS/Wi-Fi settings and partitions were preserved; no firmware extraction, backup or provisioning was performed. Updated server and simulator are running. Private launcher settings enable face delivery and map the existing stable simulator ID to the existing HTTP device address.
+- **Hardware integration fix** — Live ESP-IDF rejected .NET's chunked JSON with HTTP 400. `Esp32FaceDelivery` now sends a fixed-length JSON body; the focused test asserts Content-Length/content type. Suppressed routine HTTP-client info logs. All 54 focused face/voice/speaker tests passed after this fix.
+- **Live verification** — The simulator text field “Zamrač se.” produced `angry` on Mac, server and physical ESP32 `/face`, with delivery `delivered`. Happy, sad, surprised, eyes_closed and idle matched the real device API; duplicate commands preserved the revision; blink retained the base expression; invalid expressions returned 400. With Mac disconnected, ESP32 still updated, and reconnect restored Mac's current happy expression. Resetting only the remote logical state to idle was reconciled back to happy by the server. Final connected state was angry.
+- **Speech/camera** — One Piper synthesis returned the original WAV and ESP32 accepted its PCM upload. A synthetic Piper WAV “Robote, prosím tě, buď smutný.” passed local Whisper confidence/intent recognition, one-use authorization and command execution; ESP32 reported sad. A shorter synthetic sample was rejected by the existing confidence checks, which remain unchanged. Camera health reported ready after deployment. A helper verification script initially mishandled an absolute plan Location; completion was subsequently checked directly against server command history and physical device state.
+- **Manual limits** — Physical OLED pixels and audible speaker output were not directly observed. Real microphone input, physical Wi-Fi/power disconnection/reconnection and simultaneous hardware load still require user observation; automated HTTP recovery tests and live state reconciliation do not substitute for those physical checks. Existing Mac audio-output preference was preserved.
+
+## P13-B — ESP32 OLED face synchronization — 2026-11-11
+
+- **Implemented** — Reused Czech intent normalization, P4 registration/command infrastructure, SwiftUI face/lip sync, existing firmware HTTP server and SH1106 driver. Fixed “zamrač se” to `angry`; added surprised, closed eyes and temporary blink. Neutral remains `idle`. Text face commands bypass Ollama/Piper; voice retains the existing confidence/authorization pipeline.
+- **Synchronization** — Bounded per-logical-robot runtime state, opt-in `face_sync` notifications, duplicate suppression and reconnect restoration. One configured HTTP OLED uses GET/POST `/face`, independent two-second request deadlines and five-second reconnect backoff. A stale blink is never replayed. Diagnostics expose current expression, last command, connected WebSocket displays and independent HTTP delivery status. No database or audio path changes.
+- **Verification** — 139 focused .NET tests passed, including queue backpressure, HTTP failure/recovery, two-display notifications, state restoration, invalid expressions, temporary blink and existing voice/audio regressions. Xcode built the app/test target: 44 tests, 37 passed and seven opt-in tests skipped. ESP-IDF 5.5.2 built the extended existing firmware successfully.
+- **Files** — Server: `Communication/{RobotFace,Esp32FaceDelivery,RobotRegistry,RobotProtocol}.cs`, `AI/{VoiceIntent,RobotVocabulary,RobotCommandInterpreter}.cs`, `Controllers/{AiController,RobotsController}.cs`, `Program.cs`. Simulator: `Models/RobotProtocol.swift`, `Simulation/RobotSimulationEngine.swift`, `Services/{RobotConnectionService,VoiceInteraction}.swift`, `Views/{RobotFaceView,SimulatorDashboardView}.swift`. Firmware: `main/{oled.c,oled.h,camera_http.c}`. Tests: backend `FaceTests.cs`, `VoiceIntentTests.cs`, simulator `FaceTests.swift`. Documentation: this file, `ARCHITECTURE.md`, `docs/ROBOT_PROTOCOL.md`. Existing unrelated working changes were retained.
+- **Hardware pending** — No flashing, provisioning, firmware extraction or binary inspection was performed. The deployed firmware lacks `/face`; matching physical OLED output requires explicitly approved deployment, configured `Face:Esp32:RobotId`/address, then the [manual acceptance procedure](docs/ROBOT_PROTOCOL.md#configuration-and-manual-hardware-test). Real display appearance, Whisper microphone input, simultaneous audible outputs and camera/microphone coexistence remain hardware-dependent.
+
+## ESP32 speaker volume — 2026-11-11
+
+- **Changed** — Increased the private launcher setting `Speech:Esp32:Volume` from 50 to 80 percent at the user’s request and restarted the local server with the updated environment.
+- **Verification** — Confirmed the saved setting and successful server startup. The user confirmed audible ESP32 speech before this adjustment. No code tests were needed for this configuration-only change.
+
+## Simulator HTTP speaker routing fix — 2026-11-11
+
+- **Cause** — The running server did not enable the configured HTTP speaker; the simulator also showed only WSS devices and ignored HTTP delivery headers. Restarted the server with the existing private HTTP speaker settings.
+- **Fix** — Added HTTP speaker configuration discovery, explicit per-request ESP32 output selection, upload acceptance/error display and disabled unsupported HTTP remote stop. Mac output remains independent.
+- **Verification** — All 39 focused .NET speaker/voice tests passed. macOS app build and simulator test suite succeeded; request assertions cover the explicit ESP32 flag, and the opt-in speech test now restores and controls its Mac output preference. Live Piper synthesis returned the original WAV and `X-Esp32-Audio: accepted` from the configured ESP32. Audible output still requires user confirmation.
+
 ## Repository checkpoint — audio integration and head enclosure — 2026-11-11
 
 - **Scope** — ESP32 audio integration, simulator audio controls, macOS launcher, documentation and printable head enclosure assets.

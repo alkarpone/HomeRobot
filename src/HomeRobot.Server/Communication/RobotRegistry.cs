@@ -14,6 +14,7 @@ internal sealed class RobotSession(long connectedAt)
     public RobotCommandStatus? LastExecutedCommand { get; set; }
     public bool Closed { get; set; }
     public AudioPlaybackStatus? Audio { get; set; }
+    public RobotFaceState? PendingFace { get; set; }
     public RobotPlanLease? Plan { get; set; }
     public Guid VoiceTurn { get; set; } = Guid.NewGuid();
     public (Guid Id, string Text, long IssuedAt)? VoiceInstruction { get; set; }
@@ -40,7 +41,7 @@ internal sealed class RobotPlanLease
     public TaskCompletionSource<RobotCommandStatus>? Completion { get; set; }
 }
 
-public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOptions> configuration,
+public sealed partial class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOptions> configuration,
     ILogger<RobotRegistry> logger)
 {
     private const int QueueLimit = 64;
@@ -75,6 +76,8 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
             session.Registration = registration;
             Touch(session);
             robots.Add(registration.RobotId, session);
+            if (registration.Capabilities.Contains("face_sync"))
+                session.PendingFace = GetFace(registration.FaceRobotId ?? registration.RobotId) with { BlinkAt = null };
             logger.LogInformation("Robot {RobotId} registered ({DeviceType})", registration.RobotId, registration.DeviceType);
             return null;
         }
@@ -280,6 +283,19 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
                 lease.ActiveCommand = tracked;
                 lease.Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             }
+            if (command.Parameters is ExpressionParameters expression)
+            {
+                if (!SetFace(session.Registration!.FaceRobotId ?? robotId, expression.Expression))
+                {
+                    Finish(session, tracked, "failed", "face_capacity_reached");
+                    return (202, tracked.Status, null);
+                }
+                if (session.Registration.Capabilities.Contains("face_sync"))
+                {
+                    Finish(session, tracked, "completed", null);
+                    return (202, tracked.Status, null);
+                }
+            }
             var message = new OutboundMessage(new RobotMessage<RobotCommand>(status.CommandId, "command", now, command), tracked);
             if (command.IsStop || command.Command == "audio_stop")
             {
@@ -369,6 +385,11 @@ public sealed class RobotRegistry(TimeProvider clock, IOptions<RobotProtocolOpti
                 return first.Value.Body;
             }
 
+            if (session.PendingFace is { } face)
+            {
+                session.PendingFace = null;
+                return Message("face_state", face);
+            }
             return null;
         }
     }

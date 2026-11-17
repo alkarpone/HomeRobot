@@ -33,7 +33,7 @@ public sealed class VoiceIntentTests
 
     [Theory]
     [InlineData("Můžeš se usmát?", "happy")]
-    [InlineData("Mohl by ses zamračit?", "sad")]
+    [InlineData("Mohl by ses zamračit?", "angry")]
     public void RecognizesPoliteExpressionRequests(string text, string expression)
     {
         var result = VoiceIntent.Analyze(new SpeechTranscript(text, true), 30);

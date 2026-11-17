@@ -107,9 +107,12 @@ final class VisionTests: XCTestCase {
             speechRequests += 1
             XCTAssertEqual(request.url?.path, "/api/voice/synthesize")
             let body = try XCTUnwrap(request.httpBody)
-            XCTAssertEqual(try JSONDecoder().decode([String: String].self, from: body)["text"], "Vidím kruh.")
+            XCTAssertEqual((try JSONSerialization.jsonObject(with: body) as? [String: Any])?["text"] as? String, "Vidím kruh.")
             return self.wav()
         }
+        let savedMacOutput = voice.macOutput
+        defer { voice.macOutput = savedMacOutput }
+        voice.macOutput = true
         voice.analyzeImage("  ", robot: robot, followUp: false)
         try await wait { !voice.busy }
         XCTAssertEqual(vision.answer?.response, "Vidím kruh.")
@@ -153,8 +156,9 @@ final class VisionTests: XCTestCase {
             let voice = VoiceInteraction(vision: vision, fetchSpeech: { request in
                 calls += 1
                 if pauseSynthesis { try await Task.sleep(for: .milliseconds(100)) }
-                let body = try JSONDecoder().decode([String: String].self, from: XCTUnwrap(request.httpBody))
-                XCTAssertEqual(body["esp32RobotId"], esp ? "speaker" : nil)
+                let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+                XCTAssertEqual(body["esp32RobotId"] as? String, esp ? "speaker" : nil)
+                XCTAssertEqual(body["esp32Output"] as? Bool, esp)
                 XCTAssertNotNil(body["playbackId"])
                 return mac ? self.wav() : Data([0]) // ESP32-only must never decode Mac audio.
             }, fetchSpeakers: { speakerConnected ? [speaker] : [] })

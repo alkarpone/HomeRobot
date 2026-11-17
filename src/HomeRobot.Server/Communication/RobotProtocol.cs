@@ -24,7 +24,7 @@ public sealed class RobotProtocolOptions
 }
 
 public sealed record RobotRegistration(
-    string RobotId, string Name, string DeviceType, int ProtocolVersion, string[] Capabilities);
+    string RobotId, string Name, string DeviceType, int ProtocolVersion, string[] Capabilities, string? FaceRobotId = null);
 
 public sealed record RobotTelemetry(
     string RobotId, string State, RobotPosition Position, RobotMovement Movement, double BatteryPercent);
@@ -79,7 +79,7 @@ internal sealed record RobotCommand(string Command, object Parameters)
         ("rotate_left" or "rotate_right", RotateParameters rotate) =>
             rotate.AngleDegrees > 0 && rotate.AngleDegrees <= limits.MaxRotationDegrees &&
             rotate.Speed > 0 && rotate.Speed <= limits.MaxSpeed,
-        ("set_expression", ExpressionParameters expression) => RobotProtocol.IsIdentifier(expression.Expression),
+        ("set_expression", ExpressionParameters expression) => FaceExpressions.IsValid(expression.Expression),
         ("stop", EmptyParameters) => true,
         ("audio_play", AudioPlayParameters audio) => RobotProtocol.IsIdentifier(audio.PlaybackId) &&
             audio.SampleRate == 16000 && audio.Channels == 1 && audio.BitsPerSample == 16 &&
@@ -104,7 +104,7 @@ internal sealed record RobotCommand(string Command, object Parameters)
                 "rotate_left" or "rotate_right"
                     when parameters.Deserialize<RotateParameters>(RobotProtocol.Json) is { } rotate => new(request.Command, rotate),
                 "set_expression"
-                    when parameters.Deserialize<ExpressionParameters>(RobotProtocol.Json) is { } expression => new(request.Command, expression),
+                    when parameters.Deserialize<ExpressionParameters>(RobotProtocol.Json) is { } expression => new(request.Command, expression.Expression == "smile" ? new ExpressionParameters("happy") : expression),
                 "audio_stop" when parameters.Deserialize<AudioStopParameters>(RobotProtocol.Json) is { } audioStop =>
                     new(request.Command, audioStop),
                 "stop" when parameters.Deserialize<EmptyParameters>(RobotProtocol.Json) is { } stop =>
@@ -141,7 +141,7 @@ internal static class RobotProtocol
         value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.');
 
     public static bool IsValid(RobotRegistration registration) =>
-        IsIdentifier(registration.RobotId) &&
+        IsIdentifier(registration.RobotId) && (registration.FaceRobotId is null || IsIdentifier(registration.FaceRobotId)) &&
         !string.IsNullOrWhiteSpace(registration.Name) && registration.Name.Length <= 100 &&
         registration.DeviceType is "esp32" or "simulator" &&
         registration.Capabilities.Length <= 32 && registration.Capabilities.All(IsIdentifier) &&

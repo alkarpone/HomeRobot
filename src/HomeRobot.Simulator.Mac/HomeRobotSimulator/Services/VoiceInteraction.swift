@@ -47,6 +47,9 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
             deviceType == "esp32" && ["audio_output", "tts_playback", "audio_stop"].allSatisfy(capabilities.contains)
         }
     }
+    private struct HttpSpeaker: Decodable { let enabled: Bool }
+    @Published private(set) var httpSpeakerEnabled = false
+    @Published private(set) var httpPlaybackState = "idle"
     @Published private(set) var speakers: [Speaker] = []
     @Published private(set) var lastSpeakerDetails: Speaker?
     @Published private(set) var audioError: String?
@@ -64,11 +67,16 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
             let devices: [Speaker]
             if let fetchSpeakers { devices = try await fetchSpeakers() }
             else { devices = try await robot.fetch(URLRequest(url: api.appendingPathComponent("robots"), timeoutInterval: 5)) }
+            if fetchSpeakers == nil {
+                let configuration: HttpSpeaker = try await robot.fetch(URLRequest(
+                    url: api.appendingPathComponent("audio/http-speaker"), timeoutInterval: 5))
+                httpSpeakerEnabled = configuration.enabled
+            }
             speakers = devices.filter(\.compatible)
             if selectedSpeaker.isEmpty, let first = speakers.first { selectedSpeaker = first.robotId }
             if let speaker = selectedSpeakerDetails { lastSpeakerDetails = speaker }
         } catch {
-            if !Task.isCancelled { speakers = [] }
+            if !Task.isCancelled { speakers = []; httpSpeakerEnabled = false }
         }
     }
 
@@ -117,14 +125,15 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
             do {
                 if chatServer != api { chatServer = api; sessionID = nil }
                 let request = try jsonRequest(api.deletingLastPathComponent().appendingPathComponent("ai/chat"),
-                    ChatRequest(message: prompt, sessionId: sessionID), timeout: 150)
+                    ChatRequest(message: prompt, sessionId: sessionID, robotId: robot.robotId), timeout: 150)
                 let start = clock.now
                 let answer: ChatReply = try await robot.fetch(request)
                 llmMs = milliseconds(since: start)
                 sessionID = answer.sessionId
                 reply = answer.response
                 conversationalExpression = Self.responseExpression(answer.expression)
-                try await speak(api: api, robot: robot, current: current)
+                if answer.faceCommand == true { phase = .idle }
+                else { try await speak(api: api, robot: robot, current: current) }
             } catch { if turn == current, !Task.isCancelled { fail(error.localizedDescription) } }
         }
     }
@@ -489,12 +498,22 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
             }
             audioError = nil
             let request = try jsonRequest(api.appendingPathComponent("synthesize"),
-                SynthesisRequest(text: spoken, esp32RobotId: destination, playbackId: playbackID), timeout: 75)
+                SynthesisRequest(text: spoken, esp32RobotId: destination, playbackId: playbackID, esp32Output: esp32Output), timeout: 75)
             let audio: Data
             if let fetchSpeech { audio = try await fetchSpeech(request) }
             else {
                 audio = try await robot.fetchData(request) { response in
-                    self.audioError = response.value(forHTTPHeaderField: "X-Audio-Error")
+                    if let status = response.value(forHTTPHeaderField: "X-Esp32-Audio") {
+                        self.httpPlaybackState = status
+                        if status == "error" {
+                            self.audioError = "ESP32 HTTP audio delivery failed. Check the device address and Wi-Fi connection."
+                        }
+                    } else {
+                        self.audioError = response.value(forHTTPHeaderField: "X-Audio-Error")
+                        if self.esp32Output && destination == nil {
+                            self.audioError = "No ESP32 speaker is configured or connected."
+                        }
+                    }
                     if self.audioError != nil { self.remotePlayback = previousRemote }
                 }
             }
@@ -639,17 +658,20 @@ final class VoiceInteraction: NSObject, ObservableObject, AVAudioPlayerDelegate 
         let text: String
         let esp32RobotId: String?
         let playbackId: String
+        let esp32Output: Bool
     }
 
     private struct ChatRequest: Encodable {
         let message: String
         let sessionId: UUID?
         let briefCzech = true
+        var robotId: String? = nil
     }
 
     private struct ChatReply: Decodable {
         let sessionId: UUID
         let response: String
         let expression: String?
+        var faceCommand: Bool? = nil
     }
 }

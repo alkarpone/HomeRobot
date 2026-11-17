@@ -26,6 +26,9 @@ public sealed class RobotsController(RobotRegistry registry, IOptions<RobotProto
     [HttpPost("{robotId}/stop")]
     public IActionResult Stop(string robotId) => SubmitCommand(robotId, new RobotCommand("stop", new EmptyParameters()));
 
+    [HttpGet("{robotId}/face")]
+    public IActionResult Face(string robotId) => RobotProtocol.IsIdentifier(robotId) ? Ok(registry.GetFace(robotId)) : BadRequest();
+
     [HttpGet("{robotId}/commands")]
     public IReadOnlyList<RobotCommandStatus> History(string robotId) => registry.CommandHistory(robotId);
 

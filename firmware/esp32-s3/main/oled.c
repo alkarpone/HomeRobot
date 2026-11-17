@@ -1,4 +1,10 @@
 #include "oled.h"
+#include "speaker_manager.h"
+#include <string.h>
+#include <stdio.h>
+#include "esp_timer.h"
+#include "esp_http_server.h"
+#include "cJSON.h"
 
 #include "driver/i2c_master.h"
 #include "esp_log.h"
@@ -33,41 +39,109 @@ enum {
     OLED_HEIGHT = 64,
     SH1106_RAM_WIDTH = 132,
     SH1106_COLUMN_OFFSET = (SH1106_RAM_WIDTH - OLED_WIDTH) / 2,
-    FACE_HALF_CYCLE = 16,
 };
 
-static bool face_pixel(int x, int y, int gaze, int smile)
+typedef enum { IDLE, LISTENING, THINKING, SPEAKING, HAPPY, SAD, ERROR_FACE, ANGRY, SURPRISED, EYES_CLOSED } face_expression_t;
+static const char *expressions[] = {"idle", "listening", "thinking", "speaking", "happy", "sad", "error", "angry", "surprised", "eyes_closed"};
+static portMUX_TYPE face_lock = portMUX_INITIALIZER_UNLOCKED;
+static face_expression_t selected_face = IDLE;
+static int64_t blink_until;
+static bool display_ready;
+
+static esp_err_t face_get(httpd_req_t *req)
 {
-    int eye_x = x - (x < OLED_WIDTH / 2 ? 40 : 87);
-    if (y >= 7 && y <= 8 && eye_x >= -7 && eye_x <= 7) {
-        return true;
+    portENTER_CRITICAL(&face_lock);
+    face_expression_t face = selected_face;
+    bool ready = display_ready;
+    portEXIT_CRITICAL(&face_lock);
+    if (!ready) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(req, "OLED unavailable");
     }
-
-    eye_x -= gaze;
-    int eye_y = y - 24;
-    if (eye_x * eye_x * 121 + eye_y * eye_y * 100 <= 12100) {
-        return true;
-    }
-
-    int smile_x = x - 63;
-    int half_width = 32 + smile / 2;
-    int width_squared = half_width * half_width;
-    int depth = 6 + smile / 2;
-    int smile_y = 54 - (depth * smile_x * smile_x + width_squared / 2) / width_squared;
-    return smile_x >= -half_width && smile_x <= half_width &&
-           y >= smile_y - 1 && y <= smile_y + 1;
+    char body[64];
+    snprintf(body, sizeof(body), "{\"expression\":\"%s\"}", expressions[face]);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, body);
 }
 
-static int face_wave(int phase)
+static esp_err_t face_post(httpd_req_t *req)
 {
-    phase %= 2 * FACE_HALF_CYCLE;
-    return phase <= FACE_HALF_CYCLE ? phase : 2 * FACE_HALF_CYCLE - phase;
+    if (req->content_len <= 0 || req->content_len >= 96)
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Expected expression JSON");
+    char body[96] = {0};
+    int received = 0;
+    while (received < req->content_len) {
+        int count = httpd_req_recv(req, body + received, req->content_len - received);
+        if (count <= 0) return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Incomplete body");
+        received += count;
+    }
+    const char *end = NULL;
+    cJSON *json = cJSON_ParseWithLengthOpts(body, received + 1, &end, true);
+    cJSON *value = cJSON_GetObjectItemCaseSensitive(json, "expression");
+    int face = -1;
+    bool blink = false;
+    if (cJSON_IsObject(json) && cJSON_GetArraySize(json) == 1 && cJSON_IsString(value)) {
+        for (int i = 0; i < sizeof(expressions) / sizeof(expressions[0]); ++i)
+            if (strcmp(value->valuestring, expressions[i]) == 0) face = i;
+        blink = strcmp(value->valuestring, "blink") == 0;
+    }
+    cJSON_Delete(json);
+    if (face < 0 && !blink) return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Unsupported expression");
+    portENTER_CRITICAL(&face_lock);
+    bool ready = display_ready;
+    if (ready) {
+        if (blink) blink_until = esp_timer_get_time() + 180000;
+        else { selected_face = face; blink_until = 0; }
+    }
+    portEXIT_CRITICAL(&face_lock);
+    if (!ready) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(req, "OLED unavailable");
+    }
+    httpd_resp_set_status(req, "202 Accepted");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"status\":\"accepted\"}");
 }
 
-static esp_err_t sh1106_write_face(i2c_master_dev_handle_t device, int phase)
+esp_err_t oled_http_register(httpd_handle_t server)
 {
-    int gaze = face_wave(phase) - FACE_HALF_CYCLE / 2;
-    int smile = face_wave(phase + FACE_HALF_CYCLE / 2);
+    const httpd_uri_t get = {.uri = "/face", .method = HTTP_GET, .handler = face_get};
+    const httpd_uri_t post = {.uri = "/face", .method = HTTP_POST, .handler = face_post};
+    esp_err_t err = httpd_register_uri_handler(server, &get);
+    return err == ESP_OK ? httpd_register_uri_handler(server, &post) : err;
+}
+
+static bool face_pixel(int x, int y, int gaze, int opening)
+{
+    face_expression_t face = gaze;
+    int side = x < OLED_WIDTH / 2 ? -1 : 1;
+    int ex = x - (side < 0 ? 40 : 87);
+    int ey = y - 25;
+    bool closed = face == EYES_CLOSED;
+    int height = face == SURPRISED ? 14 : (face == ANGRY || face == HAPPY || face == SAD || face == ERROR_FACE ? 6 : 11);
+    if (closed ? (ex >= -10 && ex <= 10 && ey >= 0 && ey <= 2) :
+        (ex * ex * height * height + ey * ey * 100 <= 100 * height * height)) return true;
+    int brow = 8;
+    if (face == ANGRY || face == ERROR_FACE) brow -= side * ex / 2;
+    if (face == SAD) brow += side * ex / 2;
+    if (ex >= -12 && ex <= 12 && y >= brow && y <= brow + 1) return true;
+    int mx = x - 63;
+    if (opening > 0) {
+        int my = y - 50;
+        int width = 8 + opening * 3;
+        int height = opening * 3;
+        return mx * mx * height * height + my * my * width * width <= width * width * height * height;
+    }
+    int mouth_y = 49;
+    if (face == HAPPY) mouth_y = 54 - mx * mx / 100;
+    if (face == SAD || face == ANGRY || face == ERROR_FACE) mouth_y = 46 + mx * mx / 100;
+    return mx >= -23 && mx <= 23 && y >= mouth_y && y <= mouth_y + 1;
+}
+
+static esp_err_t sh1106_write_face(i2c_master_dev_handle_t device, int phase, unsigned opening)
+{
+    int gaze = phase;
     for (int page = 0; page < OLED_HEIGHT / 8; ++page) {
         // Select this RAM page and reset the column address to zero.
         const uint8_t select_page[] = {0x00, 0xB0 | page, 0x00, 0x10};
@@ -80,7 +154,7 @@ static esp_err_t sh1106_write_face(i2c_master_dev_handle_t device, int phase)
         uint8_t data[1 + SH1106_RAM_WIDTH] = {0x40};
         for (int x = 0; x < OLED_WIDTH; ++x) {
             for (int bit = 0; bit < 8; ++bit) {
-                if (face_pixel(x, page * 8 + bit, gaze, smile)) {
+                if (face_pixel(x, page * 8 + bit, gaze, opening)) {
                     data[1 + SH1106_COLUMN_OFFSET + x] |= 1U << bit;
                 }
             }
@@ -95,19 +169,29 @@ static esp_err_t sh1106_write_face(i2c_master_dev_handle_t device, int phase)
 
 static esp_err_t sh1106_animate(i2c_master_dev_handle_t device, uint8_t address)
 {
-    TickType_t frame_start = xTaskGetTickCount();
-    bool first_frame = true;
-    for (int phase = 1; ; phase = (phase + 1) % (2 * FACE_HALF_CYCLE)) {
-        vTaskDelayUntil(&frame_start, pdMS_TO_TICKS(160));
-        esp_err_t err = sh1106_write_face(device, phase);
-        if (err != ESP_OK) {
-            return err;
+    (void)address;
+    int previous = -1;
+    unsigned previous_opening = 0;
+    portENTER_CRITICAL(&face_lock);
+    display_ready = true;
+    portEXIT_CRITICAL(&face_lock);
+    for (;;) {
+        portENTER_CRITICAL(&face_lock);
+        int face = esp_timer_get_time() < blink_until ? EYES_CLOSED : selected_face;
+        portEXIT_CRITICAL(&face_lock);
+        unsigned opening = speaker_mouth_opening();
+        if (face != previous || opening != previous_opening) {
+            esp_err_t err = sh1106_write_face(device, face, opening);
+            if (err != ESP_OK) {
+                portENTER_CRITICAL(&face_lock);
+                display_ready = false;
+                portEXIT_CRITICAL(&face_lock);
+                return err;
+            }
+            previous = face;
+            previous_opening = opening;
         }
-        if (first_frame) {
-            ESP_LOGI(TAG, "SH1106 initialization and animated smiley frames acknowledged at 0x%02X",
-                     address);
-            first_frame = false;
-        }
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
@@ -138,7 +222,7 @@ static void sh1106_show_face(i2c_master_bus_handle_t bus, uint8_t address)
     if (err == ESP_OK) {
         err = i2c_master_transmit(device, commands, sizeof(commands), TIMEOUT_MS);
         if (err == ESP_OK) {
-            err = sh1106_write_face(device, 0);
+            err = sh1106_write_face(device, 0, 0);
         }
         if (err == ESP_OK) {
             const uint8_t display_on[] = {0x00, 0xAF};
@@ -149,7 +233,7 @@ static void sh1106_show_face(i2c_master_bus_handle_t bus, uint8_t address)
         }
         i2c_master_bus_rm_device(device);
     }
-    ESP_LOGE(TAG, "SH1106 initialization or smiley animation failed at 0x%02X: %s",
+    ESP_LOGE(TAG, "SH1106 initialization or face update failed at 0x%02X: %s",
              address, esp_err_to_name(err));
 }
 

@@ -79,7 +79,7 @@ public sealed class VoiceController(
             var wave = await tts.SynthesizeAsync(request.Text, cancellationToken);
             diagnostics.RecordSpeech(false, "ready");
             logger.LogInformation("Piper sample synthesis completed.");
-            if (settings.GetValue<bool>("Speech:Esp32:Enabled"))
+            if (request.Esp32Output && settings.GetValue<bool>("Speech:Esp32:Enabled"))
             {
                 try
                 {
@@ -97,7 +97,7 @@ public sealed class VoiceController(
                     logger.LogWarning("ESP32 HTTP audio delivery failed.");
                 }
             }
-            else if (request.Esp32RobotId is { } robotId)
+            else if (request.Esp32Output && request.Esp32RobotId is { } robotId)
             {
                 try
                 {
@@ -195,5 +195,5 @@ public sealed class VoiceController(
         return result with { Text = result.Text.Trim() };
     }
 
-    public sealed record SynthesisRequest(string? Text, string? Esp32RobotId = null, string? PlaybackId = null);
+    public sealed record SynthesisRequest(string? Text, string? Esp32RobotId = null, string? PlaybackId = null, bool Esp32Output = true);
 }

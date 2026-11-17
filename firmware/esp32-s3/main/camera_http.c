@@ -1,4 +1,5 @@
 #include "camera_http.h"
+#include "oled.h"
 #include "microphone.h"
 #include "speaker_manager.h"
 
@@ -256,6 +257,7 @@ esp_err_t camera_http_start(void)
     xSemaphoreGive(stream_slot);
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 16;
     config.recv_wait_timeout = 3;
     config.send_wait_timeout = 3;
     config.lru_purge_enable = true;
@@ -280,6 +282,8 @@ esp_err_t camera_http_start(void)
             return err;
         }
     }
+    err = oled_http_register(server);
+    if (err != ESP_OK) ESP_LOGE(TAG, "Cannot register face routes: %s", esp_err_to_name(err));
     err = speaker_http_register(server);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Cannot register audio routes: %s", esp_err_to_name(err));

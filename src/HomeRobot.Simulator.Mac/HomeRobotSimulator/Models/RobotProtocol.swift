@@ -42,6 +42,8 @@ struct IncomingMessage: Decodable {
         let inactivityTimeoutSeconds: Int?
         let code: String?
         let replyTo: String?
+        let expression: String?
+        let blinkAt: String?
     }
 
     var hasValidEnvelope: Bool {
@@ -60,7 +62,7 @@ struct Registration: Encodable {
     let name = "HomeRobot Simulator"
     let deviceType = "simulator"
     let protocolVersion = RobotProtocol.version
-    let capabilities = ["movement", "display"]
+    let capabilities = ["movement", "display", "face_sync"]
 }
 
 struct Heartbeat: Encodable {

@@ -11,6 +11,8 @@ extern "C" {
 typedef esp_err_t (*speaker_reader_t)(void *context, int16_t *samples, size_t frames);
 typedef void (*speaker_started_t)(void *context);
 esp_err_t speaker_stream(size_t frames, speaker_reader_t reader, speaker_started_t started, void *context);
+// Nonblocking audio mouth state (0..3); stale audio closes automatically.
+unsigned speaker_mouth_opening(void);
 void speaker_cancel(void);
 bool speaker_available(void);
 esp_err_t speaker_init(void);

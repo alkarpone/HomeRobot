@@ -75,7 +75,7 @@ internal sealed record VoiceIntent(string Text, string Route, string? Intent = n
         if (unsupported is not null)
             return new(text, "unsupported", unsupported, "This command is unavailable.");
 
-        foreach (var expression in new[] { "happy", "sad" })
+        foreach (var expression in new[] { "happy", "sad", "angry", "surprised", "eyes_closed", "blink", "idle" })
             if (RobotVocabulary.Phrases[expression].Contains(clause))
                 return new(text, "action", "set_expression", Actions: [new("set_expression", new ExpressionParameters(expression))]);
 

@@ -16,10 +16,10 @@ struct SimulatorDashboardView: View {
                 HStack(spacing: 16) {
                     panel("Robot Face") {
                         RobotFaceView(
-                            expression: VoiceInteraction.faceExpression(phase: voice.phase,
+                            expression: robot.engine.hasSynchronizedFace ? robot.engine.expression : VoiceInteraction.faceExpression(phase: voice.phase,
                                 isMoving: robot.engine.motion != nil, commanded: robot.engine.expression,
                                 conversational: voice.conversationalExpression),
-                            mouthOpenness: { voice.mouthOpenness }
+                            mouthOpenness: { voice.mouthOpenness }, isSpeaking: voice.phase == .speaking
                         )
                     }
                     panel("Movement Monitor") {
@@ -75,13 +75,21 @@ struct SimulatorDashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             Toggle("Mac Speakers", isOn: $voice.macOutput)
             Toggle("ESP32 Speaker", isOn: $voice.esp32Output)
-            Picker("Physical robot", selection: $voice.selectedSpeaker) {
-                Text(voice.selectedSpeaker.isEmpty ? "No speaker" : voice.selectedSpeaker + " (saved)")
-                    .tag(voice.selectedSpeakerDetails == nil ? voice.selectedSpeaker : "")
-                ForEach(voice.speakers) { Text($0.name).tag($0.robotId) }
+            if voice.httpSpeakerEnabled {
+                Text("Physical speaker: server HTTP configuration")
+            } else {
+                Picker("Physical robot", selection: $voice.selectedSpeaker) {
+                    Text(voice.selectedSpeaker.isEmpty ? "No speaker" : voice.selectedSpeaker + " (saved)")
+                        .tag(voice.selectedSpeakerDetails == nil ? voice.selectedSpeaker : "")
+                    ForEach(voice.speakers) { Text($0.name).tag($0.robotId) }
+                }
             }
             Text("Mac: \(voice.macPlaybackState)")
-            if let speaker = voice.speakerDiagnostics {
+            if voice.httpSpeakerEnabled {
+                Text("ESP32 HTTP: \(voice.httpPlaybackState)")
+                Text("Accepted confirms upload only. Remote stop and playback status require WebSocket firmware.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if let speaker = voice.speakerDiagnostics {
                 Text("ESP32: \(voice.selectedSpeakerDetails == nil ? "disconnected" : "connected") · audio_output, tts_playback, audio_stop · \(speaker.audio?.status ?? "idle")")
                 if let error = speaker.audio?.error { Text(error).foregroundStyle(.orange) }
             } else { Text("ESP32: disconnected") }
@@ -89,6 +97,7 @@ struct SimulatorDashboardView: View {
             HStack {
                 Button("Stop Mac") { voice.stopMacPlayback() }
                 Button("Stop ESP32") { voice.stopEsp32Playback(robot: robot) }
+                    .disabled(voice.httpSpeakerEnabled)
                 Button("Stop Playback") { voice.stopPlayback(robot: robot) }
             }
         }

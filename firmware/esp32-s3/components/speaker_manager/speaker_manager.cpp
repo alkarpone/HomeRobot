@@ -36,6 +36,32 @@ i2s_chan_handle_t tx;
 std::atomic<bool> busy{false};
 std::atomic<bool> cancelled{false};
 std::atomic<bool> streaming{false};
+std::atomic<unsigned> mouth_opening{0};
+std::atomic<int64_t> mouth_updated{0};
+
+// Average the actual volume-scaled mono samples over 40 ms.
+struct MouthEnvelope {
+    unsigned sum = 0;
+    unsigned count = 0;
+    unsigned level = 0;
+
+    bool sample(int value)
+    {
+        sum += value < 0 ? -value : value;
+        if (++count != sample_rate / 25) return false;
+        const unsigned amplitude = sum / count;
+        const unsigned target = amplitude < 120 ? 0 : amplitude < 600 ? 1 : amplitude < 1800 ? 2 : 3;
+        // Fast attack, one-step release; silence always closes immediately.
+        level = target == 0 || target >= level ? target : level - 1;
+        sum = count = 0;
+        return true;
+    }
+};
+
+struct MouthReset {
+    ~MouthReset() { mouth_opening.store(0); }
+};
+
 volatile uint32_t underruns; // Written by the I2S ISR. Read and reset with TX disabled.
 
 bool IRAM_ATTR on_send_queue_overflow(i2s_chan_handle_t, i2s_event_data_t *, void *)
@@ -59,6 +85,9 @@ esp_err_t write_frames(const int16_t (&stereo)[frames_per_buffer * 2])
 esp_err_t play(const int16_t *pcm, size_t frames, unsigned volume,
                speaker_reader_t reader = nullptr, speaker_started_t started = nullptr, void *context = nullptr)
 {
+    MouthReset mouth_reset;
+    MouthEnvelope envelope;
+    mouth_opening.store(0);
     int16_t stereo[frames_per_buffer * 2]{};
     // Start with 40 ms of silence and clear stale DMA data from any failed job.
     for (size_t i = 0; i < dma_buffers; ++i) {
@@ -85,15 +114,22 @@ esp_err_t play(const int16_t *pcm, size_t frames, unsigned volume,
             if (err != ESP_OK || cancelled.load()) { err = ESP_FAIL; break; }
             if (offset == 0 && started) started(context);
         }
+        bool mouth_ready = false;
         for (size_t i = 0; i < count; ++i) {
             const size_t frame = offset + i;
             const int sample = reader ? chunk[i] : pcm ? pcm[frame] :
                 static_cast<int>(tone_peak * std::sin(2.0f * 3.14159265f *
                     ((frame * tone_hz) % sample_rate) / sample_rate));
-            stereo[i * 2] = stereo[i * 2 + 1] = sample * static_cast<int>(volume) / 100;
+            const int output = sample * static_cast<int>(volume) / 100;
+            stereo[i * 2] = stereo[i * 2 + 1] = output;
+            mouth_ready = envelope.sample(output) || mouth_ready;
         }
         std::fill(stereo + count * 2, stereo + frames_per_buffer * 2, 0);
         err = write_frames(stereo);
+        if (err == ESP_OK && mouth_ready) {
+            mouth_updated.store(esp_timer_get_time());
+            mouth_opening.store(envelope.level);
+        }
     }
 
     // Wait for the last audio buffer to go around the DMA ring before stopping clocks.
@@ -236,6 +272,12 @@ esp_err_t submit(httpd_req_t *req)
 } // namespace
 
 bool speaker_available(void) { return tx != nullptr; }
+
+unsigned speaker_mouth_opening(void)
+{
+    if (cancelled.load() || esp_timer_get_time() - mouth_updated.load() > 120000) return 0;
+    return mouth_opening.load();
+}
 
 void speaker_cancel(void) { if (streaming.load()) cancelled.store(true); }
 

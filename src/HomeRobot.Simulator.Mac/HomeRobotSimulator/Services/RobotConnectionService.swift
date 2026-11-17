@@ -185,6 +185,8 @@ final class RobotConnectionService: ObservableObject {
         }
     }
 
+    private var faceUpdateID = UUID()
+
     private func receive(_ text: String) {
         let data = Data(text.utf8)
         guard let message = try? JSONDecoder().decode(IncomingMessage.self, from: data) else {
@@ -225,6 +227,26 @@ final class RobotConnectionService: ObservableObject {
                     guard !Task.isCancelled, let self, self.socket === socket else { return }
                     self.send("heartbeat", Heartbeat(robotId: self.robotId))
                     self.checkConnection(socket, timeout: .seconds(timeout))
+                }
+            }
+        case "face_state":
+            guard connectionState == .connected, let expression = payload.expression else { return }
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let blinkDate = payload.blinkAt.flatMap { value -> Date? in
+                if let date = formatter.date(from: value) { return date }
+                formatter.formatOptions = [.withInternetDateTime]
+                return formatter.date(from: value)
+            }
+            let blink = blinkDate.map { abs($0.timeIntervalSinceNow) < 0.5 } ?? false
+            engine.synchronizeFace(expression, blink: blink)
+            faceUpdateID = UUID()
+            let updateID = faceUpdateID
+            if blink {
+                Task { [weak self] in
+                    try? await Task.sleep(for: .milliseconds(180))
+                    guard let self, self.faceUpdateID == updateID else { return }
+                    self.engine.synchronizeFace(expression)
                 }
             }
         case "command":

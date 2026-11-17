@@ -73,7 +73,7 @@ The ESP32-S3 joins the LAN as a station and logs its DHCP address. This camera
 bring-up is independent of HomeRobot.Server and the P4 WebSocket protocol.
 
 The OLED task scans and drives I2C0 on GPIO1 (SDA) and GPIO2 (SCK) while
-Wi-Fi and HTTP start. It updates the SH1106 face in a loop and releases I2C0
+Wi-Fi and HTTP start. It renders the selected logical SH1106 face only when it changes and releases I2C0
 if a transfer fails. The OV5640 uses I2C1 for SCCB on GPIO4 and GPIO5.
 
 ## ESP32-S3 speaker output
@@ -100,7 +100,10 @@ responsive. Disconnect cancels playback and reconnect starts a fresh session.
 
 The simulator persists output toggles and device selection, polls P4 audio status,
 and routes text, microphone and Vision replies through its existing synthesis/player.
-Mac errors and remote errors are independent. Pending playback IDs let a stop suppress
+The configured HTTP speaker is discovered separately through `/api/audio/http-speaker`;
+the simulator sends an explicit ESP32 output flag and displays HTTP upload acceptance
+or failure independently of P4 registration. HTTP firmware has no remote stop or
+completion status. Mac errors and remote errors are independent. Pending playback IDs let a stop suppress
 late delivery during synthesis. P10 exposes physical speaker diagnostics and a Piper
 test. See [setup, limits and hardware verification](docs/ESP32_TTS.md).
 
@@ -120,7 +123,7 @@ A deterministic differential-drive model uses monotonic elapsed time to integrat
 
 The face samples a speech envelope from the existing voice player's `currentTime` on its SwiftUI animation timeline (up to 30 updates per second). Before playback, the simulator reads the Piper PCM WAV once off the main actor. It computes RMS over approximately 20 ms windows, applies a configurable noise gate and attack/release smoothing, then interpolates mouth openness between windows. Playback uses the original WAV data. The mouth closes when the player stops, and completion or cancellation clears the envelope. The amplitude mapping approximates speech rhythm. It does not distinguish phonemes. Unsupported envelope formats can still play with a neutral mouth if AVAudioPlayer accepts them.
 
-Temporary voice states take precedence over movement, and movement takes precedence over the expression last set by P4. When speech ends, the face restores the conversational hint when available. The next voice turn or successful P4 expression clears the hint. Executing is a local face state and the P4 expression vocabulary stays the same.
+For a `face_sync` connection, the server owns the displayed logical expression, including during movement and speech. The existing audio envelope animates the mouth independently. Before a synchronized state arrives, the original local voice/movement/conversation priorities remain available. Executing remains a local fallback state.
 
 Robot Settings uses the dashboard's server address for direct loopback HTTP requests, independently of robot registration. SwiftUI keeps drafts and fetched records in memory only; SQLite and the server profile remain authoritative. Category filtering runs on the server; text search runs on the loaded records. Diagnostics show the last API check and loaded record count rather than database metrics.
 
@@ -168,3 +171,26 @@ loopback. Nonlocal traffic requires explicit opt-in, direct HTTPS and single-adm
 authentication against a configured digest. Origin and Fetch Metadata checks protect browser
 requests, and simple cross-origin forms cannot submit P4 robot commands. The loopback-only
 Vision ingestion and conversational memory checks remain separate from dashboard access.
+
+## P13-B synchronized face
+
+`RobotRegistry` owns a bounded runtime expression per logical robot, initially `idle`
+(neutral). No SQLite writes are involved. `set_expression`, deterministic Czech voice
+intents and simulator text chat with `robotId` update that same state. Text face commands
+return without Ollama or Piper; ordinary chat and speech retain their existing routes.
+Only changed expressions emit `face_state` over the existing serialized WebSocket writer.
+Clients opt in with `face_sync`; an optional `faceRobotId` joins multiple display clients
+to one logical robot. Registration restores the current base expression without replaying
+a blink. Legacy clients retain command/ack/result delivery.
+
+The simulator reuses the existing SwiftUI face and speech envelope. `blink` is an event
+that closes eyes for 180 ms and retains the base expression. New angry, surprised and
+closed-eye poses extend the existing renderer without changing movement or audio APIs.
+
+One optional `Esp32FaceDelivery` worker maps the configured `Face:Esp32:RobotId` to an
+HTTP display. It reuses the existing firmware HTTP server and trusted-LAN boundary.
+Logical updates are checked locally every 100 ms; GET `/face` checks remote state every
+five seconds to detect restarts. Failures wait five seconds and never block simulator
+commands or audio. POST `/face` delivers changed base expressions and live blink events;
+a reconnect restores only the latest base expression. HTTP acceptance is distinct from
+physical display verification. See the [contract and manual procedure](docs/ROBOT_PROTOCOL.md#p13-b-face-synchronization).
